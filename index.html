@@ -70,9 +70,59 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .neg{color:#991b1b;font-weight:600}
 .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:12px}
 @media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
+
+/* PIN screen */
+#pin-screen{position:fixed;inset:0;background:#1b2a4a;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:0}
+#pin-screen.hidden{display:none}
+.pin-box{background:#fff;border-radius:16px;padding:2rem 2.5rem;width:320px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.3)}
+.pin-logo{font-size:15px;font-weight:700;color:#1b2a4a;margin-bottom:4px}
+.pin-sub{font-size:12px;color:#888;margin-bottom:1.5rem}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:1.5rem}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid #d0d9e8;background:#fff;transition:all .15s}
+.pin-dot.filled{background:#1b2a4a;border-color:#1b2a4a}
+.pin-dot.error{background:#ef4444;border-color:#ef4444}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
+.pin-key{padding:14px;border:1px solid #e0e6ef;border-radius:10px;background:#f5f7fa;font-size:18px;font-weight:600;cursor:pointer;color:#1b2a4a;transition:all .15s;font-family:inherit}
+.pin-key:hover{background:#dbeafe;border-color:#93c5fd}
+.pin-key:active{transform:scale(.95)}
+.pin-key.wide{grid-column:span 2}
+.pin-err{font-size:12px;color:#dc2626;height:16px;margin-bottom:4px}
+.pin-hint{font-size:11px;color:#aaa;margin-top:8px}
+
 </style>
 </head>
 <body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <div class="pin-box">
+    <div class="pin-logo">AAFETS — Leave Management</div>
+    <div class="pin-sub">Enter your 4-digit PIN to continue</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" onclick="pinClear()" style="font-size:13px;color:#888">Clear</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" onclick="pinBack()" style="font-size:13px;color:#888">&#9003;</button>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="pin-hint">Default PIN: 5287 &nbsp;·&nbsp; Change it in Settings</div>
+  </div>
+</div>
+
 <div class="app">
 
   <!-- TOP BAR -->
@@ -610,6 +660,65 @@ document.getElementById('log-filter-emp').innerHTML=
   `<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
 toggleHourly();
 renderDashboard();
+
+/* ── PIN Logic ──────────────────────────────────────── */
+const DEFAULT_PIN='1234';
+let pinEntry='';
+let pinUnlocked=false;
+
+function getPin(){return localStorage.getItem('aafets_pin')||DEFAULT_PIN;}
+function getSessionKey(){return sessionStorage.getItem('aafets_unlocked');}
+
+function checkSession(){
+  if(getSessionKey()==='yes'){
+    document.getElementById('pin-screen').classList.add('hidden');
+    pinUnlocked=true;
+  }
+}
+
+function pinKey(k){
+  if(pinEntry.length>=4)return;
+  pinEntry+=k;
+  updateDots();
+  if(pinEntry.length===4)setTimeout(checkPin,120);
+}
+
+function pinBack(){pinEntry=pinEntry.slice(0,-1);updateDots();}
+function pinClear(){pinEntry='';updateDots();}
+
+function updateDots(state){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('d'+i);
+    d.className='pin-dot'+(i<pinEntry.length?' filled':'')+(state==='error'?' error':'');
+  }
+}
+
+function checkPin(){
+  if(pinEntry===getPin()){
+    sessionStorage.setItem('aafets_unlocked','yes');
+    document.getElementById('pin-screen').classList.add('hidden');
+    pinUnlocked=true;
+  } else {
+    updateDots('error');
+    document.getElementById('pin-err').textContent='Incorrect PIN. Try again.';
+    setTimeout(()=>{
+      pinEntry='';
+      updateDots();
+      document.getElementById('pin-err').textContent='';
+    },800);
+  }
+}
+
+// Allow keyboard input on PIN screen
+document.addEventListener('keydown',function(e){
+  if(pinUnlocked)return;
+  if(e.key>='0'&&e.key<='9')pinKey(e.key);
+  if(e.key==='Backspace')pinBack();
+  if(e.key==='Escape')pinClear();
+});
+
+checkSession();
+
 </script>
 </body>
 </html>
