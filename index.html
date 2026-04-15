@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AAFETS — Leave Management</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:14px;background:#f0f2f5;color:#1a1a1a;min-height:100vh}
+.app{max-width:1140px;margin:0 auto;padding:1rem}
+.topbar{background:#1b2a4a;border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.topbar-title{font-size:17px;font-weight:600;color:#fff}
+.topbar-sub{font-size:12px;color:#9db4d4;margin-top:2px}
+.topbar-year{font-size:12px;color:#9db4d4}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.nav button{padding:7px 16px;border-radius:8px;border:1px solid #d0d9e8;background:#fff;color:#555;font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit;font-weight:500}
+.nav button.active{background:#dbeafe;color:#1e40af;border-color:#93c5fd;font-weight:600}
+.nav button:hover:not(.active){background:#f5f7fa}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:600;color:#1b2a4a;margin-bottom:12px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:1rem}
+.metric{background:#f5f7fa;border-radius:10px;padding:14px 16px;border:1px solid #e8ecf2}
+.metric .lbl{font-size:12px;color:#888;margin-bottom:6px;font-weight:500}
+.metric .val{font-size:26px;font-weight:700;color:#1b2a4a}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#f5f7fa;padding:9px 11px;text-align:left;font-weight:600;font-size:11px;color:#666;border-bottom:1px solid #e0e6ef;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px}
+tbody tr{border-bottom:1px solid #f2f4f7}
+tbody tr:hover{background:#fafbff}
+tbody td{padding:9px 11px;vertical-align:middle}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-ok{background:#dcfce7;color:#166534}
+.badge-low{background:#fef9c3;color:#854d0e}
+.badge-over{background:#fee2e2;color:#991b1b}
+.badge-annual{background:#dbeafe;color:#1e40af}
+.badge-sick{background:#fef3c7;color:#92400e}
+.badge-hourly{background:#ede9fe;color:#5b21b6}
+.badge-hol{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px}
+.field label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:5px}
+input,select,textarea{width:100%;padding:8px 11px;border:1px solid #d0d9e8;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit;transition:border .15s}
+input:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+input[readonly]{background:#f5f7fa;color:#888}
+input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
+.btn{padding:8px 18px;border-radius:8px;border:1px solid #d0d9e8;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;font-family:inherit;transition:all .15s}
+.btn-primary{background:#1b2a4a;color:#fff;border-color:#1b2a4a}
+.btn-primary:hover{background:#243860}
+.btn:hover{background:#f5f7fa}
+.btn-danger{background:#fff;color:#dc2626;border-color:#fca5a5;font-size:11px;padding:3px 9px}
+.btn-danger:hover{background:#fee2e2}
+.btn-sm{padding:5px 12px;font-size:12px}
+.alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;font-weight:500}
+.alert-warn{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.alert-success{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.alert-danger{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.emp-avatar{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:#dbeafe;color:#1e40af;flex-shrink:0}
+.emp-cell{display:flex;align-items:center;gap:8px}
+.balance-bar{height:6px;border-radius:3px;background:#e8ecf2;overflow:hidden;min-width:70px;display:inline-block;vertical-align:middle}
+.bfill{height:100%;border-radius:3px;transition:width .4s}
+.bar-ok{background:#22c55e}.bar-low{background:#f59e0b}.bar-over{background:#ef4444}
+.tbl-wrap{overflow-x:auto}
+.sep{border:none;border-top:1px solid #f0f2f5;margin:12px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.check-row{display:flex;align-items:center;gap:6px;font-size:13px;color:#444;margin-bottom:10px}
+.page-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filter-row select{width:160px}
+.muted{color:#888;font-size:12px}
+.pos{color:#166534;font-weight:600}
+.neg{color:#991b1b;font-weight:600}
+.info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:12px}
+@media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">AAFETS — Leave Management System</div>
+      <div class="topbar-sub">IT Operations Team &nbsp;·&nbsp; Supervisor View &nbsp;·&nbsp; <span id="cur-date"></span></div>
+    </div>
+    <div class="topbar-year">Year: <strong style="color:#fff">2026</strong></div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="active" onclick="showPanel('dashboard')">Dashboard</button>
+    <button onclick="showPanel('log')">Leave Log</button>
+    <button onclick="showPanel('add')">+ Add Leave</button>
+    <button onclick="showPanel('adjustments')">Adjustments</button>
+    <button onclick="showPanel('holidays')">Holidays</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: DASHBOARD
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-dashboard" class="panel active">
+    <div class="grid4" id="dash-metrics"></div>
+    <div class="card">
+      <div class="card-title">Employee leave balances</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Employee</th>
+            <th>Opening</th>
+            <th>Accrued</th>
+            <th>Adjustments</th>
+            <th>Total earned</th>
+            <th>Taken (days)</th>
+            <th>Remaining</th>
+            <th>Hourly taken</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody id="balance-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: LEAVE LOG
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-log" class="panel">
+    <div class="card">
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Leave log</div>
+        <div class="filter-row">
+          <select id="log-filter-emp" onchange="renderLog()">
+            <option value="">All employees</option>
+          </select>
+          <select id="log-filter-type" onchange="renderLog()">
+            <option value="">All types</option>
+            <option>Annual Leave</option>
+            <option>Sick Leave</option>
+            <option>Hourly Leave</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Employee</th><th>Type</th><th>From</th><th>To</th>
+            <th>Days</th><th>Hours</th><th>Deducted</th><th>Holiday?</th><th>Remarks</th><th></th>
+          </tr></thead>
+          <tbody id="log-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px" class="muted" id="log-count"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: ADD LEAVE
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-add" class="panel">
+    <div class="card" style="max-width:660px">
+      <div class="card-title">New leave entry</div>
+      <div id="add-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Employee</label><select id="add-emp"></select></div>
+        <div class="field">
+          <label>Leave type</label>
+          <select id="add-type" onchange="toggleHourly()">
+            <option>Annual Leave</option>
+            <option>Sick Leave</option>
+            <option>Hourly Leave</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Full-day fields -->
+      <div id="fullday-block">
+        <div class="form-row">
+          <div class="field"><label>Date from</label><input type="date" id="add-from" onchange="calcDays()"></div>
+          <div class="field"><label>Date to</label><input type="date" id="add-to" onchange="calcDays()"></div>
+        </div>
+        <div class="form-row" id="days-preview-row" style="display:none">
+          <div class="field"><label>Working days (auto)</label><input type="text" id="add-days-val" readonly></div>
+        </div>
+      </div>
+
+      <!-- Hourly fields -->
+      <div id="hourly-block" style="display:none">
+        <div class="form-row">
+          <div class="field"><label>Date</label><input type="date" id="add-hourly-date"></div>
+          <div class="field">
+            <label>Hours (0.5 – 7.5, in 0.5 steps)</label>
+            <input type="number" id="add-hours" min="0.5" max="7.5" step="0.5" value="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field"><label>Remarks (optional)</label><input type="text" id="add-remarks" placeholder="e.g. Medical appointment"></div>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="add-holiday-override">
+        <label for="add-holiday-override">Mark as holiday override — will not deduct from balance</label>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="addLeave()">Save entry</button>
+        <button class="btn" onclick="showPanel('log')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: ADJUSTMENTS
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-adjustments" class="panel">
+    <div class="card" style="max-width:660px;margin-bottom:1rem">
+      <div class="card-title">Add balance adjustment</div>
+      <div class="info-box">Use this to add days when an employee works on an unplanned national holiday, or to manually correct any balance.</div>
+      <div id="adj-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Employee</label><select id="adj-emp"></select></div>
+        <div class="field"><label>Days to add / deduct (+/-)</label><input type="number" id="adj-days" step="0.25" placeholder="e.g. 1 or -0.5"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="adj-date"></div>
+        <div class="field">
+          <label>Override opening balance (optional)</label>
+          <input type="number" id="adj-opening" step="0.5" placeholder="Leave blank to keep current (3.00)">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Reason</label><input type="text" id="adj-reason" placeholder="e.g. Worked on Eid holiday 18-Mar"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="addAdjustment()">Save adjustment</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Adjustment history</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Employee</th><th>Date</th><th>Days</th><th>Reason</th><th></th></tr></thead>
+          <tbody id="adj-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       PANEL: HOLIDAYS
+  ══════════════════════════════════════════════════════ -->
+  <div id="panel-holidays" class="panel">
+    <div class="card" style="max-width:520px;margin-bottom:1rem">
+      <div class="card-title">Add public holiday</div>
+      <div class="info-box">Dates listed here are automatically excluded from leave deductions in the leave log.</div>
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="hol-date"></div>
+        <div class="field"><label>Holiday name</label><input type="text" id="hol-name" placeholder="e.g. Eid Al-Fitr"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" onclick="addHoliday()">Add holiday</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Public holidays — 2026</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Holiday name</th><th></th></tr></thead>
+          <tbody id="hol-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+const EMPLOYEES=["Abdulmajeed","Zaid Oday","Mohammed Sameer","Khattab","Abdulrahman","Haider Jawad","Baqir Adnan","Atheer M."];
+const ACCRUAL=1.75;
+
+const INIT_HOLIDAYS=[
+  {date:"2026-01-01",name:"New Year's Day"},
+  {date:"2026-01-06",name:"Army Day"},
+  {date:"2026-03-16",name:"National Ba'ath Day"},
+  {date:"2026-03-18",name:"Eid Holiday"},
+  {date:"2026-03-19",name:"Eid Holiday"},
+  {date:"2026-03-20",name:"Spring Day / Nowruz / Eid"},
+  {date:"2026-03-21",name:"Mother's Day / Nowruz / Eid"},
+  {date:"2026-03-22",name:"Eid Holiday"},
+  {date:"2026-03-23",name:"Eid Holiday"},
+  {date:"2026-04-01",name:"National Football Celebration"},
+  {date:"2026-04-02",name:"National Football Celebration"},
+  {date:"2026-05-01",name:"Labour Day"},
+  {date:"2026-07-14",name:"Republic Day"},
+  {date:"2026-10-03",name:"National Day"},
+  {date:"2026-12-25",name:"Christmas Day"},
+];
+
+const INIT_ADJ=[
+  {emp:"Abdulmajeed",date:"2026-03-18",days:1,reason:"Worked on Eid 18-Mar"},
+  {emp:"Abdulmajeed",date:"2026-03-22",days:1,reason:"Worked on Eid 22-Mar"},
+  {emp:"Abdulmajeed",date:"2026-03-26",days:1,reason:"Rain Day - worked"},
+  {emp:"Abdulmajeed",date:"2026-04-01",days:1,reason:"Worked national football holiday"},
+  {emp:"Zaid Oday",date:"2026-03-18",days:1,reason:"Worked Eid 18-Mar"},
+  {emp:"Zaid Oday",date:"2026-03-19",days:1,reason:"Worked Eid 19-Mar"},
+  {emp:"Zaid Oday",date:"2026-03-21",days:1,reason:"Worked Eid 21-Mar"},
+  {emp:"Zaid Oday",date:"2026-03-23",days:1,reason:"Worked Eid 23-Mar"},
+  {emp:"Khattab",date:"2026-03-16",days:1,reason:"Worked National Ba'ath Day"},
+  {emp:"Khattab",date:"2026-03-18",days:1,reason:"Worked Eid 18-Mar"},
+  {emp:"Khattab",date:"2026-03-19",days:1,reason:"Worked Eid 19-Mar"},
+  {emp:"Khattab",date:"2026-03-21",days:1,reason:"Worked Eid 21-Mar"},
+  {emp:"Khattab",date:"2026-03-22",days:1,reason:"Worked Eid 22-Mar"},
+  {emp:"Abdulrahman",date:"2026-03-16",days:1,reason:"Worked National Ba'ath Day"},
+  {emp:"Abdulrahman",date:"2026-03-20",days:1,reason:"Worked Eid 20-Mar"},
+  {emp:"Abdulrahman",date:"2026-03-23",days:1,reason:"Worked Eid 23-Mar"},
+  {emp:"Haider Jawad",date:"2026-03-18",days:1,reason:"Worked Eid 18-Mar"},
+  {emp:"Haider Jawad",date:"2026-03-20",days:1,reason:"Worked Eid 20-Mar"},
+  {emp:"Haider Jawad",date:"2026-03-22",days:1,reason:"Worked Eid 22-Mar"},
+  {emp:"Baqir Adnan",date:"2026-03-16",days:1,reason:"Worked National Ba'ath Day"},
+  {emp:"Baqir Adnan",date:"2026-04-02",days:1,reason:"Worked national football holiday"},
+  {emp:"Atheer M.",date:"2026-03-01",days:1,reason:"Won lottery in Ramadan"},
+];
+
+const INIT_LEAVES=[
+  {emp:"Khattab",type:"Sick Leave",from:"2026-01-02",to:"2026-01-02",days:1,hours:0,remarks:"Sick leave, evening shift",holiday:false},
+  {emp:"Zaid Oday",type:"Annual Leave",from:"2026-01-07",to:"2026-01-07",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Mohammed Sameer",type:"Hourly Leave",from:"2026-01-08",to:"2026-01-08",days:0,hours:3,remarks:"Hours Leave",holiday:false},
+  {emp:"Zaid Oday",type:"Hourly Leave",from:"2026-01-10",to:"2026-01-10",days:0,hours:1,remarks:"Hours Leave",holiday:false},
+  {emp:"Haider Jawad",type:"Annual Leave",from:"2026-01-19",to:"2026-01-20",days:2,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Khattab",type:"Annual Leave",from:"2026-01-16",to:"2026-01-16",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Baqir Adnan",type:"Annual Leave",from:"2026-01-16",to:"2026-01-16",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Baqir Adnan",type:"Annual Leave",from:"2026-01-21",to:"2026-01-21",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Abdulmajeed",type:"Annual Leave",from:"2026-02-08",to:"2026-02-08",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Zaid Oday",type:"Hourly Leave",from:"2026-02-11",to:"2026-02-11",days:0,hours:3,remarks:"Hourly Leave",holiday:false},
+  {emp:"Abdulrahman",type:"Hourly Leave",from:"2026-02-13",to:"2026-02-13",days:0,hours:1.5,remarks:"Hourly Leave",holiday:false},
+  {emp:"Abdulmajeed",type:"Hourly Leave",from:"2026-02-15",to:"2026-02-15",days:0,hours:1,remarks:"Hourly Leave",holiday:false},
+  {emp:"Baqir Adnan",type:"Annual Leave",from:"2026-02-19",to:"2026-02-19",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Abdulrahman",type:"Hourly Leave",from:"2026-02-20",to:"2026-02-20",days:0,hours:1.5,remarks:"Hourly Leave",holiday:false},
+  {emp:"Atheer M.",type:"Hourly Leave",from:"2026-02-24",to:"2026-02-24",days:0,hours:5,remarks:"Hourly Leave",holiday:false},
+  {emp:"Zaid Oday",type:"Annual Leave",from:"2026-03-12",to:"2026-03-12",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+  {emp:"Khattab",type:"Annual Leave",from:"2026-04-09",to:"2026-04-09",days:1,hours:0,remarks:"Annual Leave",holiday:false},
+];
+
+/* ── State ────────────────────────────────────────── */
+let S={
+  leaves:     load('leaves')     || INIT_LEAVES,
+  adjustments:load('adjustments')|| INIT_ADJ,
+  holidays:   load('holidays')   || INIT_HOLIDAYS,
+  opening:    load('opening')    || {},
+};
+
+function load(k){try{const v=localStorage.getItem('aafets_'+k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function save(){
+  try{
+    ['leaves','adjustments','holidays','opening'].forEach(k=>localStorage.setItem('aafets_'+k,JSON.stringify(S[k])));
+  }catch(e){}
+}
+
+/* ── Helpers ──────────────────────────────────────── */
+function isHoliday(d){return S.holidays.some(h=>h.date===d);}
+function isWeekend(d){const day=new Date(d+'T12:00:00').getDay();return day===5||day===6;} // Fri-Sat weekend
+
+function workingDays(fromStr,toStr){
+  let cur=new Date(fromStr+'T12:00:00'),end=new Date((toStr||fromStr)+'T12:00:00'),n=0;
+  while(cur<=end){
+    const ds=cur.toISOString().slice(0,10);
+    if(!isWeekend(ds)&&!isHoliday(ds))n++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return n;
+}
+
+function accrued(){
+  return parseFloat((new Date().getMonth()*ACCRUAL).toFixed(4));
+}
+
+function getBalance(emp){
+  const op=parseFloat(S.opening[emp]||3);
+  const ac=accrued();
+  const adj=S.adjustments.filter(a=>a.emp===emp).reduce((s,a)=>s+parseFloat(a.days),0);
+  const takenDays=S.leaves.filter(l=>l.emp===emp&&l.type!=='Hourly Leave'&&!l.holiday)
+    .reduce((s,l)=>s+parseFloat(l.days||0),0);
+  const takenHrs=S.leaves.filter(l=>l.emp===emp&&l.type==='Hourly Leave'&&!l.holiday)
+    .reduce((s,l)=>s+parseFloat(l.hours||0),0);
+  const earned=op+ac+adj;
+  return{op,ac,adj,earned,takenDays,takenHrs,remaining:earned-takenDays};
+}
+
+function initials(n){return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+
+function fmtDate(d){
+  if(!d)return'';
+  const p=d.split('-');
+  const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${p[2]}-${m[parseInt(p[1])-1]}-${p[0]}`;
+}
+
+function statusBadge(r){
+  if(r<0) return`<span class="badge badge-over">Overdrawn</span>`;
+  if(r===0)return`<span class="badge badge-over">No balance</span>`;
+  if(r<=1) return`<span class="badge badge-low">Low</span>`;
+  return`<span class="badge badge-ok">OK</span>`;
+}
+
+function typeBadge(t){
+  if(t==='Sick Leave')  return`<span class="badge badge-sick">Sick Leave</span>`;
+  if(t==='Hourly Leave')return`<span class="badge badge-hourly">Hourly Leave</span>`;
+  return`<span class="badge badge-annual">Annual Leave</span>`;
+}
+
+function barPct(rem,earned){return earned>0?Math.max(0,Math.min(100,rem/earned*100)).toFixed(0):0;}
+function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':p<0.25?'bar-low':'bar-ok';}
+
+/* ── Render: Dashboard ────────────────────────────── */
+function renderDashboard(){
+  const overdrawn=EMPLOYEES.filter(e=>getBalance(e).remaining<0).length;
+  const low=EMPLOYEES.filter(e=>{const b=getBalance(e);return b.remaining>=0&&b.remaining<=1;}).length;
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metric"><div class="lbl">Team members</div><div class="val">${EMPLOYEES.length}</div></div>
+    <div class="metric"><div class="lbl">Overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
+    <div class="metric"><div class="lbl">Low balance (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
+    <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${S.leaves.filter(l=>!l.holiday).length}</div></div>
+  `;
+  document.getElementById('balance-tbody').innerHTML=EMPLOYEES.map(emp=>{
+    const b=getBalance(emp);
+    const pct=barPct(b.remaining,b.earned);
+    const bc=barCls(b.remaining,b.earned);
+    return`<tr>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(emp)}</div><span style="font-weight:500">${emp}</span></div></td>
+      <td>${b.op.toFixed(2)}</td>
+      <td>${b.ac.toFixed(2)}</td>
+      <td class="${b.adj>=0?'pos':'neg'}">${b.adj>=0?'+':''}${b.adj.toFixed(2)}</td>
+      <td><strong>${b.earned.toFixed(2)}</strong></td>
+      <td>${b.takenDays.toFixed(2)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;min-width:38px">${b.remaining.toFixed(2)}</span>
+          <div class="balance-bar"><div class="bfill ${bc}" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td>${b.takenHrs.toFixed(1)} h</td>
+      <td>${statusBadge(b.remaining)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Render: Leave Log ────────────────────────────── */
+function renderLog(){
+  const fe=document.getElementById('log-filter-emp').value;
+  const ft=document.getElementById('log-filter-type').value;
+  let rows=[...S.leaves];
+  if(fe)rows=rows.filter(l=>l.emp===fe);
+  if(ft)rows=rows.filter(l=>l.type===ft);
+  rows.sort((a,b)=>b.from.localeCompare(a.from));
+  document.getElementById('log-tbody').innerHTML=rows.map((l,i)=>{
+    const oi=S.leaves.indexOf(l);
+    const deducted=l.holiday?'<span class="badge badge-hol">Holiday</span>':
+      l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days;
+    return`<tr>
+      <td class="muted">${rows.length-i}</td>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(l.emp)}</div><span>${l.emp}</span></div></td>
+      <td>${typeBadge(l.type)}</td>
+      <td style="white-space:nowrap">${fmtDate(l.from)}</td>
+      <td style="white-space:nowrap">${fmtDate(l.to||l.from)}</td>
+      <td>${l.type==='Hourly Leave'?'—':l.days}</td>
+      <td>${l.hours>0?l.hours+' h':'—'}</td>
+      <td>${deducted}</td>
+      <td>${l.holiday?'<span class="badge badge-hol">Yes</span>':''}</td>
+      <td class="muted">${l.remarks||''}</td>
+      <td><button class="btn btn-danger" onclick="delLeave(${oi})">Delete</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('log-count').textContent=`${rows.length} entries`;
+}
+
+/* ── Render: Adjustments ──────────────────────────── */
+function renderAdj(){
+  const sorted=[...S.adjustments].sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('adj-tbody').innerHTML=sorted.map((a,i)=>{
+    const oi=S.adjustments.indexOf(a);
+    const pos=parseFloat(a.days)>=0;
+    return`<tr>
+      <td class="muted">${sorted.length-i}</td>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(a.emp)}</div><span>${a.emp}</span></div></td>
+      <td style="white-space:nowrap">${fmtDate(a.date)}</td>
+      <td class="${pos?'pos':'neg'}">${pos?'+':''}${parseFloat(a.days).toFixed(2)}</td>
+      <td class="muted">${a.reason||''}</td>
+      <td><button class="btn btn-danger" onclick="delAdj(${oi})">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Render: Holidays ─────────────────────────────── */
+function renderHolidays(){
+  const sorted=[...S.holidays].sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('hol-tbody').innerHTML=sorted.map((h,i)=>{
+    const oi=S.holidays.indexOf(h);
+    return`<tr>
+      <td style="white-space:nowrap">${fmtDate(h.date)}</td>
+      <td>${h.name}</td>
+      <td><button class="btn btn-danger" onclick="delHol(${oi})">Delete</button></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Actions ──────────────────────────────────────── */
+function showAlert(id,msg,type='warn'){
+  const el=document.getElementById(id);
+  el.innerHTML=`<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(()=>{if(el)el.innerHTML='';},5000);
+}
+
+function toggleHourly(){
+  const isH=document.getElementById('add-type').value==='Hourly Leave';
+  document.getElementById('hourly-block').style.display=isH?'block':'none';
+  document.getElementById('fullday-block').style.display=isH?'none':'block';
+  document.getElementById('days-preview-row').style.display='none';
+}
+
+function calcDays(){
+  const f=document.getElementById('add-from').value;
+  const t=document.getElementById('add-to').value||f;
+  if(f&&t){
+    const d=workingDays(f,t);
+    document.getElementById('add-days-val').value=d+' working day(s)';
+    document.getElementById('days-preview-row').style.display='grid';
+  }
+}
+
+function addLeave(){
+  const emp=document.getElementById('add-emp').value;
+  const type=document.getElementById('add-type').value;
+  const isH=type==='Hourly Leave';
+  const isHolOvr=document.getElementById('add-holiday-override').checked;
+  const remarks=document.getElementById('add-remarks').value.trim();
+
+  if(isH){
+    const date=document.getElementById('add-hourly-date').value;
+    const hours=parseFloat(document.getElementById('add-hours').value);
+    if(!date){showAlert('add-alert','Please select a date.');return;}
+    if(!hours||hours<0.5||hours>7.5||hours%0.5!==0){showAlert('add-alert','Hours must be 0.5–7.5 in 0.5 increments.');return;}
+    S.leaves.push({emp,type,from:date,to:date,days:0,hours,remarks,holiday:isHolOvr});
+  } else {
+    const from=document.getElementById('add-from').value;
+    const to=document.getElementById('add-to').value||from;
+    if(!from){showAlert('add-alert','Please select a start date.');return;}
+    const days=workingDays(from,to);
+    if(!isHolOvr){
+      const b=getBalance(emp);
+      if(b.remaining-days<0){
+        showAlert('add-alert',`Warning: ${emp} only has ${b.remaining.toFixed(2)} days remaining. This will overdraw their balance.`,'warn');
+      }
+    }
+    S.leaves.push({emp,type,from,to,days,hours:0,remarks,holiday:isHolOvr});
+  }
+  save();
+  showAlert('add-alert','Entry saved successfully.','success');
+  ['add-from','add-to','add-hourly-date','add-remarks'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('add-hours').value='1';
+  document.getElementById('add-holiday-override').checked=false;
+  document.getElementById('days-preview-row').style.display='none';
+  renderDashboard();
+}
+
+function addAdjustment(){
+  const emp=document.getElementById('adj-emp').value;
+  const days=parseFloat(document.getElementById('adj-days').value);
+  const date=document.getElementById('adj-date').value;
+  const reason=document.getElementById('adj-reason').value.trim();
+  const opening=document.getElementById('adj-opening').value;
+  if(!date){showAlert('adj-alert','Please select a date.');return;}
+  if(isNaN(days)&&opening===''){showAlert('adj-alert','Enter days and/or an opening balance.');return;}
+  if(opening!=='') S.opening[emp]=parseFloat(opening);
+  if(!isNaN(days)&&days!==0) S.adjustments.push({emp,date,days,reason});
+  save();
+  showAlert('adj-alert','Adjustment saved.','success');
+  ['adj-days','adj-date','adj-reason','adj-opening'].forEach(id=>document.getElementById(id).value='');
+  renderDashboard(); renderAdj();
+}
+
+function addHoliday(){
+  const date=document.getElementById('hol-date').value;
+  const name=document.getElementById('hol-name').value.trim();
+  if(!date||!name){alert('Please fill in both date and name.');return;}
+  if(S.holidays.some(h=>h.date===date)){alert('This date is already a holiday.');return;}
+  S.holidays.push({date,name});
+  save();
+  document.getElementById('hol-date').value='';
+  document.getElementById('hol-name').value='';
+  renderHolidays();
+}
+
+function delLeave(i){if(!confirm('Delete this leave entry?'))return;S.leaves.splice(i,1);save();renderLog();renderDashboard();}
+function delAdj(i){if(!confirm('Delete this adjustment?'))return;S.adjustments.splice(i,1);save();renderAdj();renderDashboard();}
+function delHol(i){if(!confirm('Remove this holiday?'))return;S.holidays.splice(i,1);save();renderHolidays();}
+
+/* ── Navigation ───────────────────────────────────── */
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays'};
+  document.querySelectorAll('.nav button').forEach(b=>{if(b.textContent.trim()===map[id])b.classList.add('active');});
+  if(id==='log')renderLog();
+  if(id==='adjustments')renderAdj();
+  if(id==='holidays')renderHolidays();
+}
+
+/* ── Boot ─────────────────────────────────────────── */
+document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+['add-emp','adj-emp'].forEach(id=>{
+  document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
+});
+document.getElementById('log-filter-emp').innerHTML=
+  `<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
+toggleHourly();
+renderDashboard();
+</script>
+</body>
+</html>
