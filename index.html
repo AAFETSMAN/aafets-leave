@@ -383,6 +383,54 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     </div>
   </div>
 
+
+<!-- EDIT LEAVE MODAL -->
+<div class="modal-overlay hidden" id="edit-modal">
+  <div class="modal">
+    <div class="modal-title">
+      <span>Edit leave entry</span>
+      <button class="modal-close" onclick="closeEditModal()">&#x2715;</button>
+    </div>
+    <div id="edit-alert"></div>
+    <input type="hidden" id="edit-idx">
+    <div class="form-row">
+      <div class="field"><label>Employee</label><select id="edit-emp"></select></div>
+      <div class="field">
+        <label>Leave type</label>
+        <select id="edit-type" onchange="toggleEditHourly()">
+          <option>Annual Leave</option><option>Sick Leave</option><option>Hourly Leave</option>
+        </select>
+      </div>
+    </div>
+    <div id="edit-fullday-block">
+      <div class="form-row">
+        <div class="field"><label>Date from</label><input type="date" id="edit-from" onchange="calcEditDays()"></div>
+        <div class="field"><label>Date to</label><input type="date" id="edit-to" onchange="calcEditDays()"></div>
+      </div>
+      <div class="form-row" id="edit-days-preview-row" style="display:none">
+        <div class="field"><label>Working days (auto)</label><input type="text" id="edit-days-val" readonly></div>
+      </div>
+    </div>
+    <div id="edit-hourly-block" style="display:none">
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="edit-hourly-date"></div>
+        <div class="field"><label>Hours (0.5–7.5 in 0.5 steps)</label><input type="number" id="edit-hours" min="0.5" max="7.5" step="0.5" value="1"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Remarks</label><input type="text" id="edit-remarks" placeholder="Optional notes"></div>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="edit-holiday-override">
+      <label for="edit-holiday-override">Holiday override — will not deduct from balance</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveEdit()">Save changes</button>
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -1123,7 +1171,6 @@ async function init(){
   renderDashboard();
 }
 
-// Check PIN — once per browser, permanent until manual logout
 if(localStorage.getItem('aafets_unlocked')==='yes'){
   document.getElementById('pin-screen').classList.add('hidden');
   pinUnlocked=true;
