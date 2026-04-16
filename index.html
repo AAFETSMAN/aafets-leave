@@ -100,6 +100,15 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .sortable.asc::after{content:' ▲';color:#3b82f6}
 .sortable.desc::after{content:' ▼';color:#3b82f6}
 
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:7000}
+.modal-overlay.hidden{display:none}
+.modal{background:#fff;border-radius:14px;padding:1.5rem 1.75rem;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;margin:1rem}
+.modal-title{font-size:15px;font-weight:700;color:#1b2a4a;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0 4px}
+.modal-close:hover{color:#333}
+.modal-footer{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f0f2f5}
+
 </style>
 </head>
 <body>
@@ -677,7 +686,10 @@ function renderLog(){
       <td>${ded}</td>
       <td>${l.holiday?'<span class="badge badge-hol">Yes</span>':''}</td>
       <td class="muted">${l.remarks||''}</td>
-      <td><button class="btn btn-danger" onclick="delLeave(${l._oi})">Delete</button></td>
+      <td style="white-space:nowrap;display:flex;gap:4px">
+        <button class="btn" style="padding:3px 9px;font-size:11px;color:#1e40af;border-color:#93c5fd" onclick="openEditModal(${l._oi})">Edit</button>
+        <button class="btn btn-danger" onclick="delLeave(${l._oi})">Delete</button>
+      </td>
     </tr>`;
   }).join('');
   document.getElementById('log-count').textContent=`${rows.length} entries`;
@@ -849,12 +861,95 @@ function showPanel(id){
   if(id==='holidays')renderHolidays();
 }
 
+
+/* ══════════════════════════════════════════════
+   EDIT LEAVE MODAL
+══════════════════════════════════════════════ */
+function openEditModal(idx){
+  const l=S.leaves[idx];
+  if(!l)return;
+  document.getElementById('edit-idx').value=idx;
+  document.getElementById('edit-emp').value=l.emp;
+  document.getElementById('edit-type').value=l.type;
+  document.getElementById('edit-remarks').value=l.remarks||'';
+  document.getElementById('edit-holiday-override').checked=!!l.holiday;
+  if(l.type==='Hourly Leave'){
+    document.getElementById('edit-hourly-date').value=l.from||'';
+    document.getElementById('edit-hours').value=l.hours||1;
+  } else {
+    document.getElementById('edit-from').value=l.from||'';
+    document.getElementById('edit-to').value=l.to||l.from||'';
+    calcEditDays();
+  }
+  toggleEditHourly();
+  document.getElementById('edit-alert').innerHTML='';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal(){
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function toggleEditHourly(){
+  const isH=document.getElementById('edit-type').value==='Hourly Leave';
+  document.getElementById('edit-hourly-block').style.display=isH?'block':'none';
+  document.getElementById('edit-fullday-block').style.display=isH?'none':'block';
+}
+
+function calcEditDays(){
+  const f=document.getElementById('edit-from').value;
+  const t=document.getElementById('edit-to').value||f;
+  if(f&&t){
+    const d=workingDays(f,t);
+    document.getElementById('edit-days-val').value=d+' working day(s)';
+    document.getElementById('edit-days-preview-row').style.display='grid';
+  }
+}
+
+function saveEdit(){
+  const idx=parseInt(document.getElementById('edit-idx').value);
+  const emp=document.getElementById('edit-emp').value;
+  const type=document.getElementById('edit-type').value;
+  const isH=type==='Hourly Leave';
+  const isHolOvr=document.getElementById('edit-holiday-override').checked;
+  const remarks=document.getElementById('edit-remarks').value.trim();
+
+  if(isH){
+    const date=document.getElementById('edit-hourly-date').value;
+    const hours=parseFloat(document.getElementById('edit-hours').value);
+    if(!date){showAlert('edit-alert','Please select a date.');return;}
+    if(!hours||hours<0.5||hours>7.5||hours%0.5!==0){showAlert('edit-alert','Hours must be 0.5–7.5 in 0.5 steps.');return;}
+    S.leaves[idx]={emp,type,from:date,to:date,days:0,hours,remarks,holiday:isHolOvr};
+  } else {
+    const from=document.getElementById('edit-from').value;
+    const to=document.getElementById('edit-to').value||from;
+    if(!from){showAlert('edit-alert','Please select a start date.');return;}
+    const days=workingDays(from,to);
+    S.leaves[idx]={emp,type,from,to,days,hours:0,remarks,holiday:isHolOvr};
+  }
+
+  debounceSave();
+  closeEditModal();
+  renderLog();
+  renderDashboard();
+}
+
+// Close modal on overlay click
+document.getElementById('edit-modal').addEventListener('click',function(e){
+  if(e.target===this)closeEditModal();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&!document.getElementById('edit-modal').classList.contains('hidden'))closeEditModal();
+});
+
 /* ══════════════════════════════════════════════
    BOOT
 ══════════════════════════════════════════════ */
 async function init(){
   document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  ['add-emp','adj-emp'].forEach(id=>{document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');});
+  ['add-emp','adj-emp','edit-emp'].forEach(id=>{document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');});
   ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.innerHTML=`<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
