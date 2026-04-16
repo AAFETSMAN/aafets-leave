@@ -93,6 +93,13 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-txt{color:#fff;font-size:14px;font-weight:500}
 @media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
+
+thead th{cursor:pointer;user-select:none;position:relative}
+thead th:hover{background:#eaecf0}
+thead th.sort-asc::after{content:' ▲';font-size:9px;color:#3b82f6}
+thead th.sort-desc::after{content:' ▼';font-size:9px;color:#3b82f6}
+thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
+
 </style>
 </head>
 <body>
@@ -158,12 +165,26 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
   <div id="panel-dashboard" class="panel active">
     <div class="grid4" id="dash-metrics"></div>
     <div class="card">
-      <div class="card-title">Employee leave balances</div>
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Employee leave balances</div>
+        <div class="filter-row">
+          <select id="bal-filter-emp" onchange="renderDashboard()" style="width:180px">
+            <option value="">All employees</option>
+          </select>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>Employee</th><th>Opening</th><th>Accrued</th><th>Adjustments</th>
-            <th>Total earned</th><th>Taken (days)</th><th>Remaining</th><th>Hourly taken</th><th>Status</th>
+            <th onclick="toggleSort('bal',0)" class="sort-none">Employee</th>
+            <th onclick="toggleSort('bal',1)" class="sort-none">Opening</th>
+            <th onclick="toggleSort('bal',2)" class="sort-none">Accrued</th>
+            <th onclick="toggleSort('bal',3)" class="sort-none">Adjustments</th>
+            <th onclick="toggleSort('bal',4)" class="sort-none">Total earned</th>
+            <th onclick="toggleSort('bal',5)" class="sort-none">Taken (days)</th>
+            <th onclick="toggleSort('bal',6)" class="sort-none">Remaining</th>
+            <th onclick="toggleSort('bal',7)" class="sort-none">Hourly taken</th>
+            <th onclick="toggleSort('bal',8)" class="sort-none">Status</th>
           </tr></thead>
           <tbody id="balance-tbody"></tbody>
         </table>
@@ -187,8 +208,17 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>#</th><th>Employee</th><th>Type</th><th>From</th><th>To</th>
-            <th>Days</th><th>Hours</th><th>Deducted</th><th>Holiday?</th><th>Remarks</th><th></th>
+            <th class="sort-none" onclick="toggleSort('log',0)">#</th>
+            <th class="sort-none" onclick="toggleSort('log',1)">Employee</th>
+            <th class="sort-none" onclick="toggleSort('log',2)">Type</th>
+            <th class="sort-desc" onclick="toggleSort('log',3)">From</th>
+            <th class="sort-none" onclick="toggleSort('log',4)">To</th>
+            <th class="sort-none" onclick="toggleSort('log',5)">Days</th>
+            <th class="sort-none" onclick="toggleSort('log',6)">Hours</th>
+            <th class="sort-none" onclick="toggleSort('log',7)">Deducted</th>
+            <th class="sort-none" onclick="toggleSort('log',8)">Holiday?</th>
+            <th class="sort-none" onclick="toggleSort('log',9)">Remarks</th>
+            <th></th>
           </tr></thead>
           <tbody id="log-tbody"></tbody>
         </table>
@@ -260,10 +290,24 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="actions"><button class="btn btn-primary" onclick="addAdjustment()">Save adjustment</button></div>
     </div>
     <div class="card">
-      <div class="card-title">Adjustment history</div>
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Adjustment history</div>
+        <div class="filter-row">
+          <select id="adj-filter-emp" onchange="renderAdj()" style="width:180px">
+            <option value="">All employees</option>
+          </select>
+        </div>
+      </div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>#</th><th>Employee</th><th>Date</th><th>Days</th><th>Reason</th><th></th></tr></thead>
+          <thead><tr>
+            <th class="sort-none" onclick="toggleSort('adj',0)">#</th>
+            <th class="sort-none" onclick="toggleSort('adj',1)">Employee</th>
+            <th class="sort-desc" onclick="toggleSort('adj',2)">Date</th>
+            <th class="sort-none" onclick="toggleSort('adj',3)">Days</th>
+            <th class="sort-none" onclick="toggleSort('adj',4)">Reason</th>
+            <th></th>
+          </tr></thead>
           <tbody id="adj-tbody"></tbody>
         </table>
       </div>
@@ -285,7 +329,11 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="card-title">Public holidays — 2026</div>
       <div class="tbl-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Holiday name</th><th></th></tr></thead>
+          <thead><tr>
+            <th class="sort-asc" onclick="toggleSort('hol',0)">Date</th>
+            <th class="sort-none" onclick="toggleSort('hol',1)">Holiday name</th>
+            <th></th>
+          </tr></thead>
           <tbody id="hol-tbody"></tbody>
         </table>
       </div>
@@ -538,10 +586,21 @@ function renderDashboard(){
     <div class="metric"><div class="lbl">Overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
     <div class="metric"><div class="lbl">Low balance (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
     <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
-  document.getElementById('balance-tbody').innerHTML=EMPLOYEES.map(emp=>{
-    const b=getBalance(emp);
+  const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
+  let balRows=EMPLOYEES.map(emp=>{const b=getBalance(emp);return{emp,...b};});
+  if(feB)balRows=balRows.filter(r=>r.emp===feB);
+  const balKeys=['emp','op','ac','adj','earned','takenDays','remaining','takenHrs','_status'];
+  balRows=balRows.map(r=>({...r,_status:r.remaining<0?0:r.remaining===0?1:r.remaining<=1?2:3}));
+  const {col:bc,dir:bd}=sortState.bal;
+  balRows.sort((a,b)=>{
+    let av=a[balKeys[bc]],bv=b[balKeys[bc]];
+    if(typeof av==='number'&&typeof bv==='number')return bd*(av-bv);
+    return bd*String(av||'').localeCompare(String(bv||''));
+  });
+  document.getElementById('balance-tbody').innerHTML=balRows.map(r=>{
+    const b=r;
     return`<tr>
-      <td><div class="emp-cell"><div class="emp-avatar">${initials(emp)}</div><span style="font-weight:500">${emp}</span></div></td>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(b.emp)}</div><span style="font-weight:500">${b.emp}</span></div></td>
       <td>${b.op.toFixed(2)}</td><td>${b.ac.toFixed(2)}</td>
       <td class="${b.adj>=0?'pos':'neg'}">${b.adj>=0?'+':''}${b.adj.toFixed(2)}</td>
       <td><strong>${b.earned.toFixed(2)}</strong></td>
@@ -554,19 +613,53 @@ function renderDashboard(){
       <td>${statusBadge(b.remaining)}</td>
     </tr>`;
   }).join('');
+  setThClasses('panel-dashboard',bc,bd);
 }
+/* sort state per table */
+const sortState={log:{col:3,dir:-1},adj:{col:2,dir:-1},hol:{col:0,dir:1},bal:{col:0,dir:1}};
+
+function sortRows(rows,col,dir,keys){
+  return rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number') return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
+}
+
+function setThClasses(tableId,activeCol,dir){
+  const ths=document.querySelectorAll(`#${tableId} thead th`);
+  ths.forEach((th,i)=>{
+    th.className=i===activeCol?(dir===1?'sort-asc':'sort-desc'):'sort-none';
+  });
+}
+
+function toggleSort(table,col){
+  if(sortState[table].col===col) sortState[table].dir*=-1;
+  else{sortState[table].col=col;sortState[table].dir=1;}
+  if(table==='log')renderLog();
+  else if(table==='adj')renderAdj();
+  else if(table==='hol')renderHolidays();
+  else if(table==='bal')renderDashboard();
+}
+
 function renderLog(){
   const fe=document.getElementById('log-filter-emp').value;
   const ft=document.getElementById('log-filter-type').value;
-  let rows=[...(S.leaves||[])];
+  let rows=(S.leaves||[]).map((l,oi)=>({...l,_oi:oi}));
   if(fe)rows=rows.filter(l=>l.emp===fe);
   if(ft)rows=rows.filter(l=>l.type===ft);
-  rows.sort((a,b)=>b.from.localeCompare(a.from));
+  const keys=['_seq','emp','type','from','to','days','hours','_deducted','_holiday','remarks'];
+  rows=rows.map((l,i)=>({...l,_seq:i,_deducted:l.holiday?-1:l.type==='Hourly Leave'?l.hours/8:parseFloat(l.days||0),_holiday:l.holiday?1:0}));
+  const {col,dir}=sortState.log;
+  rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number')return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
   document.getElementById('log-tbody').innerHTML=rows.map((l,i)=>{
-    const oi=(S.leaves||[]).indexOf(l);
     const ded=l.holiday?'<span class="badge badge-hol">Holiday</span>':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days;
     return`<tr>
-      <td class="muted">${rows.length-i}</td>
+      <td class="muted">${i+1}</td>
       <td><div class="emp-cell"><div class="emp-avatar">${initials(l.emp)}</div><span>${l.emp}</span></div></td>
       <td>${typeBadge(l.type)}</td>
       <td style="white-space:nowrap">${fmtDate(l.from)}</td>
@@ -576,36 +669,50 @@ function renderLog(){
       <td>${ded}</td>
       <td>${l.holiday?'<span class="badge badge-hol">Yes</span>':''}</td>
       <td class="muted">${l.remarks||''}</td>
-      <td><button class="btn btn-danger" onclick="delLeave(${oi})">Delete</button></td>
+      <td><button class="btn btn-danger" onclick="delLeave(${l._oi})">Delete</button></td>
     </tr>`;
   }).join('');
   document.getElementById('log-count').textContent=`${rows.length} entries`;
+  setThClasses('panel-log',col,dir);
 }
 function renderAdj(){
-  const sorted=[...(S.adjustments||[])].sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('adj-tbody').innerHTML=sorted.map((a,i)=>{
-    const oi=(S.adjustments||[]).indexOf(a);
-    const pos=parseFloat(a.days)>=0;
+  const fe=document.getElementById('adj-filter-emp')?document.getElementById('adj-filter-emp').value:'';
+  let rows=(S.adjustments||[]).map((a,oi)=>({...a,_oi:oi,_days:parseFloat(a.days)}));
+  if(fe)rows=rows.filter(a=>a.emp===fe);
+  const keys=['_seq','emp','date','_days','reason'];
+  const {col,dir}=sortState.adj;
+  rows=rows.map((a,i)=>({...a,_seq:i}));
+  rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number')return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
+  document.getElementById('adj-tbody').innerHTML=rows.map((a,i)=>{
+    const pos=a._days>=0;
     return`<tr>
-      <td class="muted">${sorted.length-i}</td>
+      <td class="muted">${i+1}</td>
       <td><div class="emp-cell"><div class="emp-avatar">${initials(a.emp)}</div><span>${a.emp}</span></div></td>
       <td style="white-space:nowrap">${fmtDate(a.date)}</td>
-      <td class="${pos?'pos':'neg'}">${pos?'+':''}${parseFloat(a.days).toFixed(2)}</td>
+      <td class="${pos?'pos':'neg'}">${pos?'+':''}${a._days.toFixed(2)}</td>
       <td class="muted">${a.reason||''}</td>
-      <td><button class="btn btn-danger" onclick="delAdj(${oi})">Delete</button></td>
+      <td><button class="btn btn-danger" onclick="delAdj(${a._oi})">Delete</button></td>
     </tr>`;
   }).join('');
+  setThClasses('panel-adjustments',col,dir);
 }
 function renderHolidays(){
-  const sorted=[...(S.holidays||[])].sort((a,b)=>a.date.localeCompare(b.date));
-  document.getElementById('hol-tbody').innerHTML=sorted.map((h,i)=>{
-    const oi=(S.holidays||[]).indexOf(h);
+  let rows=(S.holidays||[]).map((h,oi)=>({...h,_oi:oi}));
+  const keys=['date','name'];
+  const {col,dir}=sortState.hol;
+  rows.sort((a,b)=>dir*String(a[keys[col]]||'').localeCompare(String(b[keys[col]]||'')));
+  document.getElementById('hol-tbody').innerHTML=rows.map((h,i)=>{
     return`<tr>
       <td style="white-space:nowrap">${fmtDate(h.date)}</td>
       <td>${h.name}</td>
-      <td><button class="btn btn-danger" onclick="delHol(${oi})">Delete</button></td>
+      <td><button class="btn btn-danger" onclick="delHol(${h._oi})">Delete</button></td>
     </tr>`;
   }).join('');
+  setThClasses('panel-holidays',col,dir);
 }
 
 /* ══════════════════════════════════════════════
@@ -740,7 +847,10 @@ function showPanel(id){
 async function init(){
   document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   ['add-emp','adj-emp'].forEach(id=>{document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');});
-  document.getElementById('log-filter-emp').innerHTML=`<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
+  ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=`<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
+  });
   toggleHourly();
   await loadFromCloud();
   renderDashboard();
