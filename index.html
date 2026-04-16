@@ -94,11 +94,11 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .loading-txt{color:#fff;font-size:14px;font-weight:500}
 @media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
 
-thead th{cursor:pointer;user-select:none;position:relative}
-thead th:hover{background:#eaecf0}
-thead th.sort-asc::after{content:' ▲';font-size:9px;color:#3b82f6}
-thead th.sort-desc::after{content:' ▼';font-size:9px;color:#3b82f6}
-thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
+.sortable{cursor:pointer;user-select:none}
+.sortable:hover{background:#e8edf5 !important}
+.sortable::after{content:' ⇅';font-size:10px;color:#bbb;margin-left:2px}
+.sortable.asc::after{content:' ▲';color:#3b82f6}
+.sortable.desc::after{content:' ▼';color:#3b82f6}
 
 </style>
 </head>
@@ -176,15 +176,15 @@ thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th onclick="toggleSort('bal',0)" class="sort-none">Employee</th>
-            <th onclick="toggleSort('bal',1)" class="sort-none">Opening</th>
-            <th onclick="toggleSort('bal',2)" class="sort-none">Accrued</th>
-            <th onclick="toggleSort('bal',3)" class="sort-none">Adjustments</th>
-            <th onclick="toggleSort('bal',4)" class="sort-none">Total earned</th>
-            <th onclick="toggleSort('bal',5)" class="sort-none">Taken (days)</th>
-            <th onclick="toggleSort('bal',6)" class="sort-none">Remaining</th>
-            <th onclick="toggleSort('bal',7)" class="sort-none">Hourly taken</th>
-            <th onclick="toggleSort('bal',8)" class="sort-none">Status</th>
+            <th class="sortable" data-col="0" data-table="bal">Employee</th>
+            <th class="sortable" data-col="1" data-table="bal">Opening</th>
+            <th class="sortable" data-col="2" data-table="bal">Accrued</th>
+            <th class="sortable" data-col="3" data-table="bal">Adjustments</th>
+            <th class="sortable" data-col="4" data-table="bal">Total earned</th>
+            <th class="sortable" data-col="5" data-table="bal">Taken (days)</th>
+            <th class="sortable" data-col="6" data-table="bal">Remaining</th>
+            <th class="sortable" data-col="7" data-table="bal">Hourly taken</th>
+            <th class="sortable" data-col="8" data-table="bal">Status</th>
           </tr></thead>
           <tbody id="balance-tbody"></tbody>
         </table>
@@ -208,16 +208,16 @@ thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th class="sort-none" onclick="toggleSort('log',0)">#</th>
-            <th class="sort-none" onclick="toggleSort('log',1)">Employee</th>
-            <th class="sort-none" onclick="toggleSort('log',2)">Type</th>
-            <th class="sort-desc" onclick="toggleSort('log',3)">From</th>
-            <th class="sort-none" onclick="toggleSort('log',4)">To</th>
-            <th class="sort-none" onclick="toggleSort('log',5)">Days</th>
-            <th class="sort-none" onclick="toggleSort('log',6)">Hours</th>
-            <th class="sort-none" onclick="toggleSort('log',7)">Deducted</th>
-            <th class="sort-none" onclick="toggleSort('log',8)">Holiday?</th>
-            <th class="sort-none" onclick="toggleSort('log',9)">Remarks</th>
+            <th>#</th>
+            <th class="sortable" data-col="1" data-table="log">Employee</th>
+            <th class="sortable" data-col="2" data-table="log">Type</th>
+            <th class="sortable" data-col="3" data-table="log">From</th>
+            <th class="sortable" data-col="4" data-table="log">To</th>
+            <th class="sortable" data-col="5" data-table="log">Days</th>
+            <th class="sortable" data-col="6" data-table="log">Hours</th>
+            <th class="sortable" data-col="7" data-table="log">Deducted</th>
+            <th class="sortable" data-col="8" data-table="log">Holiday?</th>
+            <th class="sortable" data-col="9" data-table="log">Remarks</th>
             <th></th>
           </tr></thead>
           <tbody id="log-tbody"></tbody>
@@ -301,11 +301,11 @@ thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th class="sort-none" onclick="toggleSort('adj',0)">#</th>
-            <th class="sort-none" onclick="toggleSort('adj',1)">Employee</th>
-            <th class="sort-desc" onclick="toggleSort('adj',2)">Date</th>
-            <th class="sort-none" onclick="toggleSort('adj',3)">Days</th>
-            <th class="sort-none" onclick="toggleSort('adj',4)">Reason</th>
+            <th>#</th>
+            <th class="sortable" data-col="1" data-table="adj">Employee</th>
+            <th class="sortable" data-col="2" data-table="adj">Date</th>
+            <th class="sortable" data-col="3" data-table="adj">Days</th>
+            <th class="sortable" data-col="4" data-table="adj">Reason</th>
             <th></th>
           </tr></thead>
           <tbody id="adj-tbody"></tbody>
@@ -330,8 +330,8 @@ thead th.sort-none::after{content:' ⇅';font-size:9px;color:#ccc}
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th class="sort-asc" onclick="toggleSort('hol',0)">Date</th>
-            <th class="sort-none" onclick="toggleSort('hol',1)">Holiday name</th>
+            <th class="sortable asc" data-col="0" data-table="hol">Date</th>
+            <th class="sortable" data-col="1" data-table="hol">Holiday name</th>
             <th></th>
           </tr></thead>
           <tbody id="hol-tbody"></tbody>
@@ -627,9 +627,11 @@ function sortRows(rows,col,dir,keys){
 }
 
 function setThClasses(tableId,activeCol,dir){
-  const ths=document.querySelectorAll(`#${tableId} thead th`);
-  ths.forEach((th,i)=>{
-    th.className=i===activeCol?(dir===1?'sort-asc':'sort-desc'):'sort-none';
+  document.querySelectorAll('#'+tableId+' thead th.sortable').forEach(function(th){
+    th.classList.remove('asc','desc');
+    if(parseInt(th.dataset.col)===activeCol){
+      th.classList.add(dir===1?'asc':'desc');
+    }
   });
 }
 
@@ -641,6 +643,12 @@ function toggleSort(table,col){
   else if(table==='hol')renderHolidays();
   else if(table==='bal')renderDashboard();
 }
+document.addEventListener('click',function(e){
+  var th=e.target.closest('th.sortable');
+  if(!th)return;
+  var table=th.dataset.table, col=parseInt(th.dataset.col);
+  if(table&&!isNaN(col))toggleSort(table,col);
+});
 
 function renderLog(){
   const fe=document.getElementById('log-filter-emp').value;
