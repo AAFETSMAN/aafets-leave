@@ -547,7 +547,7 @@ function workingDays(fromStr,toStr){
 }
 function accrued(){return parseFloat((new Date().getMonth()*ACCRUAL).toFixed(4));}
 function getBalance(emp){
-  const op=parseFloat((S.opening||{})[emp]||3);
+  const op=parseFloat((S.opening||{})[emp]||0);
   const ac=accrued();
   const adj=(S.adjustments||[]).filter(a=>a.emp===emp).reduce((s,a)=>s+parseFloat(a.days),0);
   const takenDays=(S.leaves||[]).filter(l=>l.emp===emp&&l.type!=='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
