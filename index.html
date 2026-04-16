@@ -575,7 +575,7 @@ function updateDots(err){
 }
 function checkPin(){
   if(pinEntry===PIN_CODE){
-    localStorage.setItem('aafets_unlocked', Date.now().toString());
+    localStorage.setItem('aafets_unlocked', 'yes');
     document.getElementById('pin-screen').classList.add('hidden');
     pinUnlocked=true;
     init();
@@ -1123,10 +1123,8 @@ async function init(){
   renderDashboard();
 }
 
-// Check PIN session — valid for 8 hours
-const _pinTs = parseInt(localStorage.getItem('aafets_unlocked')||'0');
-const _pinValid = (Date.now() - _pinTs) < 8 * 60 * 60 * 1000;
-if(_pinValid){
+// Check PIN — once per browser, permanent until manual logout
+if(localStorage.getItem('aafets_unlocked')==='yes'){
   document.getElementById('pin-screen').classList.add('hidden');
   pinUnlocked=true;
   init();
