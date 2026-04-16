@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AAFETS — Leave Management</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:14px;background:#f0f2f5;color:#1a1a1a;min-height:100vh}
+.app{max-width:1140px;margin:0 auto;padding:1rem}
+.topbar{background:#1b2a4a;border-radius:12px;padding:1rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.topbar-title{font-size:17px;font-weight:600;color:#fff}
+.topbar-sub{font-size:12px;color:#9db4d4;margin-top:2px}
+.sync-status{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
+.sync-ok{background:#dcfce7;color:#166534}
+.sync-saving{background:#fef9c3;color:#854d0e}
+.sync-err{background:#fee2e2;color:#991b1b}
+.nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+.nav button{padding:7px 16px;border-radius:8px;border:1px solid #d0d9e8;background:#fff;color:#555;font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit;font-weight:500}
+.nav button.active{background:#dbeafe;color:#1e40af;border-color:#93c5fd;font-weight:600}
+.nav button:hover:not(.active){background:#f5f7fa}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:600;color:#1b2a4a;margin-bottom:12px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:1rem}
+.metric{background:#f5f7fa;border-radius:10px;padding:14px 16px;border:1px solid #e8ecf2}
+.metric .lbl{font-size:12px;color:#888;margin-bottom:6px;font-weight:500}
+.metric .val{font-size:26px;font-weight:700;color:#1b2a4a}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#f5f7fa;padding:9px 11px;text-align:left;font-weight:600;font-size:11px;color:#666;border-bottom:1px solid #e0e6ef;white-space:nowrap;text-transform:uppercase;letter-spacing:.4px}
+tbody tr{border-bottom:1px solid #f2f4f7}
+tbody tr:hover{background:#fafbff}
+tbody td{padding:9px 11px;vertical-align:middle}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-ok{background:#dcfce7;color:#166534}
+.badge-low{background:#fef9c3;color:#854d0e}
+.badge-over{background:#fee2e2;color:#991b1b}
+.badge-annual{background:#dbeafe;color:#1e40af}
+.badge-sick{background:#fef3c7;color:#92400e}
+.badge-hourly{background:#ede9fe;color:#5b21b6}
+.badge-hol{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:10px}
+.field label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:5px}
+input,select{width:100%;padding:8px 11px;border:1px solid #d0d9e8;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit;transition:border .15s}
+input:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+input[readonly]{background:#f5f7fa;color:#888}
+input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
+.btn{padding:8px 18px;border-radius:8px;border:1px solid #d0d9e8;background:#fff;color:#333;font-size:13px;cursor:pointer;font-weight:600;font-family:inherit;transition:all .15s}
+.btn-primary{background:#1b2a4a;color:#fff;border-color:#1b2a4a}
+.btn-primary:hover{background:#243860}
+.btn:hover{background:#f5f7fa}
+.btn-danger{background:#fff;color:#dc2626;border-color:#fca5a5;font-size:11px;padding:3px 9px}
+.btn-danger:hover{background:#fee2e2}
+.alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;font-weight:500}
+.alert-warn{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.alert-success{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.alert-danger{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.emp-avatar{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:#dbeafe;color:#1e40af;flex-shrink:0}
+.emp-cell{display:flex;align-items:center;gap:8px}
+.balance-bar{height:6px;border-radius:3px;background:#e8ecf2;overflow:hidden;min-width:70px;display:inline-block;vertical-align:middle}
+.bfill{height:100%;border-radius:3px;transition:width .4s}
+.bar-ok{background:#22c55e}.bar-low{background:#f59e0b}.bar-over{background:#ef4444}
+.tbl-wrap{overflow-x:auto}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.check-row{display:flex;align-items:center;gap:6px;font-size:13px;color:#444;margin-bottom:10px}
+.page-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filter-row select{width:160px}
+.muted{color:#888;font-size:12px}
+.pos{color:#166534;font-weight:600}
+.neg{color:#991b1b;font-weight:600}
+.info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:12px}
+/* PIN */
+#pin-screen{position:fixed;inset:0;background:#1b2a4a;display:flex;align-items:center;justify-content:center;z-index:9999}
+#pin-screen.hidden{display:none}
+.pin-box{background:#fff;border-radius:16px;padding:2rem 2.5rem;width:320px;text-align:center}
+.pin-logo{font-size:15px;font-weight:700;color:#1b2a4a;margin-bottom:4px}
+.pin-sub{font-size:12px;color:#888;margin-bottom:1.5rem}
+.pin-dots{display:flex;gap:12px;justify-content:center;margin-bottom:1.5rem}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid #d0d9e8;background:#fff;transition:all .15s}
+.pin-dot.filled{background:#1b2a4a;border-color:#1b2a4a}
+.pin-dot.error{background:#ef4444;border-color:#ef4444}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
+.pin-key{padding:14px;border:1px solid #e0e6ef;border-radius:10px;background:#f5f7fa;font-size:18px;font-weight:600;cursor:pointer;color:#1b2a4a;transition:all .15s;font-family:inherit}
+.pin-key:hover{background:#dbeafe;border-color:#93c5fd}
+.pin-key:active{transform:scale(.95)}
+.pin-err{font-size:12px;color:#dc2626;height:16px;margin-bottom:4px}
+.pin-hint{font-size:11px;color:#aaa;margin-top:8px}
+/* Loading */
+.loading-overlay{position:fixed;inset:0;background:rgba(27,42,74,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000;gap:14px}
+.loading-overlay.hidden{display:none}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{color:#fff;font-size:14px;font-weight:500}
+@media(max-width:600px){.grid4{grid-template-columns:1fr 1fr}.form-row{grid-template-columns:1fr}}
+
+.sortable{cursor:pointer;user-select:none}
+.sortable:hover{background:#e8edf5 !important}
+.sortable::after{content:' ⇅';font-size:10px;color:#bbb;margin-left:2px}
+.sortable.asc::after{content:' ▲';color:#3b82f6}
+.sortable.desc::after{content:' ▼';color:#3b82f6}
+
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:7000}
+.modal-overlay.hidden{display:none}
+.modal{background:#fff;border-radius:14px;padding:1.5rem 1.75rem;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;margin:1rem}
+.modal-title{font-size:15px;font-weight:700;color:#1b2a4a;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1;padding:0 4px}
+.modal-close:hover{color:#333}
+.modal-footer{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f0f2f5}
+
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <div class="pin-box">
+    <div class="pin-logo">AAFETS — Leave Management</div>
+    <div class="pin-sub">Enter your PIN to continue</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="d0"></div>
+      <div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div>
+      <div class="pin-dot" id="d3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" onclick="pinClear()" style="font-size:13px;color:#888">Clear</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" onclick="pinBack()" style="font-size:13px;color:#888">&#9003;</button>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="pin-hint">Default PIN: 1234</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-txt" id="loading-txt">Loading...</div>
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">AAFETS — Leave Management System</div>
+      <div class="topbar-sub">IT Operations Team &nbsp;·&nbsp; Supervisor View &nbsp;·&nbsp; <span id="cur-date"></span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="sync-badge" class="sync-status sync-ok">Synced</span>
+      <button class="btn" style="padding:5px 12px;font-size:12px" onclick="forcSync()">&#8635; Sync</button>
+      <button class="btn" style="padding:5px 12px;font-size:12px;background:#1e6b3e;color:#fff;border-color:#1e6b3e" onclick="exportToExcel()">&#8595; Export Excel</button>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="active" onclick="showPanel('dashboard')">Dashboard</button>
+    <button onclick="showPanel('log')">Leave Log</button>
+    <button onclick="showPanel('add')">+ Add Leave</button>
+    <button onclick="showPanel('adjustments')">Adjustments</button>
+    <button onclick="showPanel('holidays')">Holidays</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="panel-dashboard" class="panel active">
+    <div class="grid4" id="dash-metrics"></div>
+    <div class="card">
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Employee leave balances</div>
+        <div class="filter-row">
+          <select id="bal-filter-emp" onchange="renderDashboard()" style="width:180px">
+            <option value="">All employees</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-col="0" data-table="bal">Employee</th>
+            <th class="sortable" data-col="1" data-table="bal">Opening</th>
+            <th class="sortable" data-col="2" data-table="bal">Accrued</th>
+            <th class="sortable" data-col="3" data-table="bal">Adjustments</th>
+            <th class="sortable" data-col="4" data-table="bal">Total earned</th>
+            <th class="sortable" data-col="5" data-table="bal">Taken (days)</th>
+            <th class="sortable" data-col="6" data-table="bal">Remaining</th>
+            <th class="sortable" data-col="7" data-table="bal">Hourly taken</th>
+            <th class="sortable" data-col="8" data-table="bal">Status</th>
+          </tr></thead>
+          <tbody id="balance-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEAVE LOG -->
+  <div id="panel-log" class="panel">
+    <div class="card">
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Leave log</div>
+        <div class="filter-row">
+          <select id="log-filter-emp" onchange="renderLog()"><option value="">All employees</option></select>
+          <select id="log-filter-type" onchange="renderLog()">
+            <option value="">All types</option>
+            <option>Annual Leave</option><option>Sick Leave</option><option>Hourly Leave</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th>
+            <th class="sortable" data-col="1" data-table="log">Employee</th>
+            <th class="sortable" data-col="2" data-table="log">Type</th>
+            <th class="sortable" data-col="3" data-table="log">From</th>
+            <th class="sortable" data-col="4" data-table="log">To</th>
+            <th class="sortable" data-col="5" data-table="log">Days</th>
+            <th class="sortable" data-col="6" data-table="log">Hours</th>
+            <th class="sortable" data-col="7" data-table="log">Deducted</th>
+            <th class="sortable" data-col="8" data-table="log">Holiday?</th>
+            <th class="sortable" data-col="9" data-table="log">Remarks</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="log-tbody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px" class="muted" id="log-count"></div>
+    </div>
+  </div>
+
+  <!-- ADD LEAVE -->
+  <div id="panel-add" class="panel">
+    <div class="card" style="max-width:660px">
+      <div class="card-title">New leave entry</div>
+      <div id="add-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Employee</label><select id="add-emp"></select></div>
+        <div class="field">
+          <label>Leave type</label>
+          <select id="add-type" onchange="toggleHourly()">
+            <option>Annual Leave</option><option>Sick Leave</option><option>Hourly Leave</option>
+          </select>
+        </div>
+      </div>
+      <div id="fullday-block">
+        <div class="form-row">
+          <div class="field"><label>Date from</label><input type="date" id="add-from" onchange="calcDays()"></div>
+          <div class="field"><label>Date to</label><input type="date" id="add-to" onchange="calcDays()"></div>
+        </div>
+        <div class="form-row" id="days-preview-row" style="display:none">
+          <div class="field"><label>Working days (auto)</label><input type="text" id="add-days-val" readonly></div>
+        </div>
+      </div>
+      <div id="hourly-block" style="display:none">
+        <div class="form-row">
+          <div class="field"><label>Date</label><input type="date" id="add-hourly-date"></div>
+          <div class="field"><label>Hours (0.5–7.5 in 0.5 steps)</label><input type="number" id="add-hours" min="0.5" max="7.5" step="0.5" value="1"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Remarks (optional)</label><input type="text" id="add-remarks" placeholder="e.g. Medical appointment"></div>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="add-holiday-override">
+        <label for="add-holiday-override">Holiday override — will not deduct from balance</label>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="addLeave()">Save entry</button>
+        <button class="btn" onclick="showPanel('log')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADJUSTMENTS -->
+  <div id="panel-adjustments" class="panel">
+    <div class="card" style="max-width:660px;margin-bottom:1rem">
+      <div class="card-title">Add balance adjustment</div>
+      <div class="info-box">Use this to credit days for working on unplanned national holidays, or to manually correct any balance.</div>
+      <div id="adj-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Employee</label><select id="adj-emp"></select></div>
+        <div class="field"><label>Days (+/-)</label><input type="number" id="adj-days" step="0.25" placeholder="e.g. 1 or -0.5"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="adj-date"></div>
+        <div class="field"><label>Override opening balance (optional)</label><input type="number" id="adj-opening" step="0.5" placeholder="Leave blank to keep current (3.00)"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Reason</label><input type="text" id="adj-reason" placeholder="e.g. Worked on Eid 18-Mar"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" onclick="addAdjustment()">Save adjustment</button></div>
+    </div>
+    <div class="card">
+      <div class="page-header">
+        <div class="card-title" style="margin:0">Adjustment history</div>
+        <div class="filter-row">
+          <select id="adj-filter-emp" onchange="renderAdj()" style="width:180px">
+            <option value="">All employees</option>
+          </select>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th>
+            <th class="sortable" data-col="1" data-table="adj">Employee</th>
+            <th class="sortable" data-col="2" data-table="adj">Date</th>
+            <th class="sortable" data-col="3" data-table="adj">Days</th>
+            <th class="sortable" data-col="4" data-table="adj">Reason</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="adj-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOLIDAYS -->
+  <div id="panel-holidays" class="panel">
+    <div class="card" style="max-width:520px;margin-bottom:1rem">
+      <div class="card-title">Add public holiday</div>
+      <div class="info-box">Dates listed here are automatically excluded from leave deductions.</div>
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="hol-date"></div>
+        <div class="field"><label>Holiday name</label><input type="text" id="hol-name" placeholder="e.g. Eid Al-Fitr"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" onclick="addHoliday()">Add holiday</button></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Public holidays — 2026</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable asc" data-col="0" data-table="hol">Date</th>
+            <th class="sortable" data-col="1" data-table="hol">Holiday name</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="hol-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   CONFIG — only the Worker URL lives here.
+   No tokens, no secrets, nothing sensitive.
+══════════════════════════════════════════════ */
+const WORKER_URL = 'https://aafets-sync.atheer-mohammed.workers.dev';
+const PIN_CODE   = '5287';
+
+/* ══════════════════════════════════════════════
+   DEFAULT DATA (used only on very first load)
+══════════════════════════════════════════════ */
+const EMPLOYEES=['Abdulmajeed','Zaid Oday','Mohammed Sameer','Khattab','Abdulrahman','Haider Jawad','Baqir Adnan','Atheer M.'];
+const ACCRUAL=1.75;
+const DEFAULT_DATA={
+    leaves:[
+    {emp:'Khattab',        type:'Sick Leave',   from:'2026-01-27',to:'2026-01-27',days:1,  hours:0,  remarks:'Sick leave, evening shift', holiday:false},
+    {emp:'Zaid Oday',      type:'Annual Leave',  from:'2026-02-01',to:'2026-02-01',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Mohammed Sameer',type:'Hourly Leave',  from:'2026-02-02',to:'2026-02-02',days:0,  hours:3,  remarks:'Hours Leave',               holiday:false},
+    {emp:'Zaid Oday',      type:'Hourly Leave',  from:'2026-02-04',to:'2026-02-04',days:0,  hours:1,  remarks:'Hours Leave',               holiday:false},
+    {emp:'Khattab',        type:'Annual Leave',  from:'2026-02-10',to:'2026-02-10',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-02-10',to:'2026-02-10',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Haider Jawad',   type:'Annual Leave',  from:'2026-02-13',to:'2026-02-14',days:2,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-02-15',to:'2026-02-15',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Abdulmajeed',    type:'Annual Leave',  from:'2026-03-05',to:'2026-03-05',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Zaid Oday',      type:'Hourly Leave',  from:'2026-03-08',to:'2026-03-08',days:0,  hours:3,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulrahman',    type:'Hourly Leave',  from:'2026-03-10',to:'2026-03-10',days:0,  hours:1.5,remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulmajeed',    type:'Hourly Leave',  from:'2026-03-12',to:'2026-03-12',days:0,  hours:1,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-03-16',to:'2026-03-16',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Khattab',        type:'Hourly Leave',  from:'2026-03-19',to:'2026-03-19',days:0,  hours:2,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulrahman',    type:'Hourly Leave',  from:'2026-03-20',to:'2026-03-20',days:0,  hours:1.5,remarks:'Hourly Leave',              holiday:false},
+    {emp:'Atheer M.',      type:'Hourly Leave',  from:'2026-03-24',to:'2026-03-24',days:0,  hours:5,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Zaid Oday',      type:'Annual Leave',  from:'2026-04-09',to:'2026-04-09',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+  ],
+  adjustments:[
+    {emp:'Abdulmajeed',date:'2026-03-18',days:1,reason:"Worked on Eid 18-Mar"},
+    {emp:'Abdulmajeed',date:'2026-03-22',days:1,reason:"Worked on Eid 22-Mar"},
+    {emp:'Abdulmajeed',date:'2026-03-26',days:1,reason:"Rain Day - worked"},
+    {emp:'Abdulmajeed',date:'2026-04-01',days:1,reason:"Worked national football holiday"},
+    {emp:'Zaid Oday',date:'2026-03-18',days:1,reason:"Worked Eid 18-Mar"},
+    {emp:'Zaid Oday',date:'2026-03-19',days:1,reason:"Worked Eid 19-Mar"},
+    {emp:'Zaid Oday',date:'2026-03-21',days:1,reason:"Worked Eid 21-Mar"},
+    {emp:'Zaid Oday',date:'2026-03-23',days:1,reason:"Worked Eid 23-Mar"},
+    {emp:'Khattab',date:'2026-03-16',days:1,reason:"Worked National Ba'ath Day"},
+    {emp:'Khattab',date:'2026-03-18',days:1,reason:"Worked Eid 18-Mar"},
+    {emp:'Khattab',date:'2026-03-19',days:1,reason:"Worked Eid 19-Mar"},
+    {emp:'Khattab',date:'2026-03-21',days:1,reason:"Worked Eid 21-Mar"},
+    {emp:'Khattab',date:'2026-03-22',days:1,reason:"Worked Eid 22-Mar"},
+    {emp:'Abdulrahman',date:'2026-03-16',days:1,reason:"Worked National Ba'ath Day"},
+    {emp:'Abdulrahman',date:'2026-03-20',days:1,reason:"Worked Eid 20-Mar"},
+    {emp:'Abdulrahman',date:'2026-03-23',days:1,reason:"Worked Eid 23-Mar"},
+    {emp:'Haider Jawad',date:'2026-03-18',days:1,reason:"Worked Eid 18-Mar"},
+    {emp:'Haider Jawad',date:'2026-03-20',days:1,reason:"Worked Eid 20-Mar"},
+    {emp:'Haider Jawad',date:'2026-03-22',days:1,reason:"Worked Eid 22-Mar"},
+    {emp:'Baqir Adnan',date:'2026-03-16',days:1,reason:"Worked National Ba'ath Day"},
+    {emp:'Baqir Adnan',date:'2026-04-02',days:1,reason:"Worked national football holiday"},
+    {emp:'Atheer M.',date:'2026-03-01',days:1,reason:"Won lottery in Ramadan"},
+  ],
+  holidays:[
+    {date:'2026-01-01',name:"New Year's Day"},
+    {date:'2026-01-06',name:'Army Day'},
+    {date:'2026-03-16',name:"National Ba'ath Day"},
+    {date:'2026-03-18',name:'Eid Holiday'},
+    {date:'2026-03-19',name:'Eid Holiday'},
+    {date:'2026-03-20',name:'Spring Day / Nowruz / Eid'},
+    {date:'2026-03-21',name:"Mother's Day / Nowruz / Eid"},
+    {date:'2026-03-22',name:'Eid Holiday'},
+    {date:'2026-03-23',name:'Eid Holiday'},
+    {date:'2026-04-01',name:'National Football Celebration'},
+    {date:'2026-04-02',name:'National Football Celebration'},
+    {date:'2026-05-01',name:'Labour Day'},
+    {date:'2026-07-14',name:'Republic Day'},
+    {date:'2026-10-03',name:'National Day'},
+    {date:'2026-12-25',name:'Christmas Day'},
+  ],
+  opening:{}
+};
+
+/* ══════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════ */
+let S={  leaves:[
+    {emp:'Khattab',        type:'Sick Leave',   from:'2026-01-27',to:'2026-01-27',days:1,  hours:0,  remarks:'Sick leave, evening shift', holiday:false},
+    {emp:'Zaid Oday',      type:'Annual Leave',  from:'2026-02-01',to:'2026-02-01',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Mohammed Sameer',type:'Hourly Leave',  from:'2026-02-02',to:'2026-02-02',days:0,  hours:3,  remarks:'Hours Leave',               holiday:false},
+    {emp:'Zaid Oday',      type:'Hourly Leave',  from:'2026-02-04',to:'2026-02-04',days:0,  hours:1,  remarks:'Hours Leave',               holiday:false},
+    {emp:'Khattab',        type:'Annual Leave',  from:'2026-02-10',to:'2026-02-10',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-02-10',to:'2026-02-10',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Haider Jawad',   type:'Annual Leave',  from:'2026-02-13',to:'2026-02-14',days:2,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-02-15',to:'2026-02-15',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Abdulmajeed',    type:'Annual Leave',  from:'2026-03-05',to:'2026-03-05',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Zaid Oday',      type:'Hourly Leave',  from:'2026-03-08',to:'2026-03-08',days:0,  hours:3,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulrahman',    type:'Hourly Leave',  from:'2026-03-10',to:'2026-03-10',days:0,  hours:1.5,remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulmajeed',    type:'Hourly Leave',  from:'2026-03-12',to:'2026-03-12',days:0,  hours:1,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Baqir Adnan',    type:'Annual Leave',  from:'2026-03-16',to:'2026-03-16',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+    {emp:'Khattab',        type:'Hourly Leave',  from:'2026-03-19',to:'2026-03-19',days:0,  hours:2,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Abdulrahman',    type:'Hourly Leave',  from:'2026-03-20',to:'2026-03-20',days:0,  hours:1.5,remarks:'Hourly Leave',              holiday:false},
+    {emp:'Atheer M.',      type:'Hourly Leave',  from:'2026-03-24',to:'2026-03-24',days:0,  hours:5,  remarks:'Hourly Leave',              holiday:false},
+    {emp:'Zaid Oday',      type:'Annual Leave',  from:'2026-04-09',to:'2026-04-09',days:1,  hours:0,  remarks:'Annual Leave',              holiday:false},
+  ],adjustments:[],holidays:[],opening:{}};
+let saveTimer=null;
+
+/* ══════════════════════════════════════════════
+   CLOUDFLARE WORKER API
+══════════════════════════════════════════════ */
+function setSyncBadge(state,msg){
+  const b=document.getElementById('sync-badge');
+  b.className='sync-status '+(state==='ok'?'sync-ok':state==='saving'?'sync-saving':'sync-err');
+  b.textContent=msg;
+}
+
+async function loadFromCloud(){
+  showLoading('Loading data...');
+  try{
+    const res=await fetch(WORKER_URL,{method:'GET'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    if(data.leaves&&data.leaves.length>0){
+      S=data;
+    } else {
+      S=JSON.parse(JSON.stringify(DEFAULT_DATA));
+      await saveToCloud();
+    }
+    try{localStorage.setItem('aafets_cache',JSON.stringify(S));}catch(e){}
+    setSyncBadge('ok','Synced');
+  }catch(e){
+    setSyncBadge('err','Offline — local cache');
+    const cached=localStorage.getItem('aafets_cache');
+    if(cached) S=JSON.parse(cached);
+    else S=JSON.parse(JSON.stringify(DEFAULT_DATA));
+  }
+  hideLoading();
+}
+
+async function saveToCloud(){
+  setSyncBadge('saving','Saving...');
+  try{localStorage.setItem('aafets_cache',JSON.stringify(S));}catch(e){}
+  try{
+    const res=await fetch(WORKER_URL,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(S)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    setSyncBadge('ok','Synced ✓');
+    setTimeout(()=>setSyncBadge('ok','Synced'),2000);
+  }catch(e){
+    setSyncBadge('err','Save failed — retrying...');
+    setTimeout(saveToCloud,5000);
+  }
+}
+
+function debounceSave(){
+  if(saveTimer)clearTimeout(saveTimer);
+  saveTimer=setTimeout(saveToCloud,800);
+}
+
+function forcSync(){
+  loadFromCloud().then(()=>{renderDashboard();renderLog();renderAdj();renderHolidays();});
+}
+
+/* ══════════════════════════════════════════════
+   LOADING
+══════════════════════════════════════════════ */
+function showLoading(msg){
+  document.getElementById('loading-txt').textContent=msg||'Loading...';
+  document.getElementById('loading').classList.remove('hidden');
+}
+function hideLoading(){document.getElementById('loading').classList.add('hidden');}
+
+/* ══════════════════════════════════════════════
+   PIN
+══════════════════════════════════════════════ */
+let pinEntry='';
+let pinUnlocked=false;
+
+function pinKey(k){
+  if(pinEntry.length>=4)return;
+  pinEntry+=k;updateDots();
+  if(pinEntry.length===4)setTimeout(checkPin,120);
+}
+function pinBack(){pinEntry=pinEntry.slice(0,-1);updateDots();}
+function pinClear(){pinEntry='';updateDots();}
+function updateDots(err){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('d'+i);
+    d.className='pin-dot'+(i<pinEntry.length?' filled':'')+(err?' error':'');
+  }
+}
+function checkPin(){
+  if(pinEntry===PIN_CODE){
+    sessionStorage.setItem('aafets_unlocked','yes');
+    document.getElementById('pin-screen').classList.add('hidden');
+    pinUnlocked=true;
+    init();
+  } else {
+    updateDots(true);
+    document.getElementById('pin-err').textContent='Incorrect PIN. Try again.';
+    setTimeout(()=>{pinEntry='';updateDots();document.getElementById('pin-err').textContent='';},900);
+  }
+}
+document.addEventListener('keydown',function(e){
+  if(pinUnlocked)return;
+  if(e.key>='0'&&e.key<='9')pinKey(e.key);
+  if(e.key==='Backspace')pinBack();
+  if(e.key==='Escape')pinClear();
+});
+
+/* ══════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════ */
+function isHoliday(d){return(S.holidays||[]).some(h=>h.date===d);}
+function isWeekend(d){const day=new Date(d+'T12:00:00').getDay();return day===5||day===6;}
+function workingDays(fromStr,toStr){
+  let cur=new Date(fromStr+'T12:00:00'),end=new Date((toStr||fromStr)+'T12:00:00'),n=0;
+  while(cur<=end){
+    const ds=cur.toISOString().slice(0,10);
+    if(!isWeekend(ds)&&!isHoliday(ds))n++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return n;
+}
+function accrued(){return parseFloat((new Date().getMonth()*ACCRUAL).toFixed(4));}
+function getBalance(emp){
+  const op=parseFloat((S.opening||{})[emp]||0);
+  const ac=accrued();
+  const adj=(S.adjustments||[]).filter(a=>a.emp===emp).reduce((s,a)=>s+parseFloat(a.days),0);
+  const takenDays=(S.leaves||[]).filter(l=>l.emp===emp&&l.type!=='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
+  const takenHrs=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.hours||0),0);
+  const earned=op+ac+adj;
+  return{op,ac,adj,earned,takenDays,takenHrs,remaining:earned-takenDays};
+}
+function initials(n){return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+function fmtDate(d){
+  if(!d)return'';
+  const p=d.split('-'),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return`${p[2]}-${m[parseInt(p[1])-1]}-${p[0]}`;
+}
+function statusBadge(r){
+  if(r<0) return`<span class="badge badge-over">Overdrawn</span>`;
+  if(r===0)return`<span class="badge badge-over">No balance</span>`;
+  if(r<=1) return`<span class="badge badge-low">Low</span>`;
+  return`<span class="badge badge-ok">OK</span>`;
+}
+function typeBadge(t){
+  if(t==='Sick Leave')  return`<span class="badge badge-sick">Sick Leave</span>`;
+  if(t==='Hourly Leave')return`<span class="badge badge-hourly">Hourly Leave</span>`;
+  return`<span class="badge badge-annual">Annual Leave</span>`;
+}
+function barPct(rem,earned){return earned>0?Math.max(0,Math.min(100,rem/earned*100)).toFixed(0):0;}
+function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':p<0.25?'bar-low':'bar-ok';}
+
+/* ══════════════════════════════════════════════
+   RENDER
+══════════════════════════════════════════════ */
+function renderDashboard(){
+  const overdrawn=EMPLOYEES.filter(e=>getBalance(e).remaining<0).length;
+  const low=EMPLOYEES.filter(e=>{const b=getBalance(e);return b.remaining>=0&&b.remaining<=1;}).length;
+  document.getElementById('dash-metrics').innerHTML=`
+    <div class="metric"><div class="lbl">Team members</div><div class="val">${EMPLOYEES.length}</div></div>
+    <div class="metric"><div class="lbl">Overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
+    <div class="metric"><div class="lbl">Low balance (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
+    <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
+  const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
+  let balRows=EMPLOYEES.map(emp=>{const b=getBalance(emp);return{emp,...b};});
+  if(feB)balRows=balRows.filter(r=>r.emp===feB);
+  const balKeys=['emp','op','ac','adj','earned','takenDays','remaining','takenHrs','_status'];
+  balRows=balRows.map(r=>({...r,_status:r.remaining<0?0:r.remaining===0?1:r.remaining<=1?2:3}));
+  const {col:bc,dir:bd}=sortState.bal;
+  balRows.sort((a,b)=>{
+    let av=a[balKeys[bc]],bv=b[balKeys[bc]];
+    if(typeof av==='number'&&typeof bv==='number')return bd*(av-bv);
+    return bd*String(av||'').localeCompare(String(bv||''));
+  });
+  document.getElementById('balance-tbody').innerHTML=balRows.map(r=>{
+    const b=r;
+    return`<tr>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(b.emp)}</div><span style="font-weight:500">${b.emp}</span></div></td>
+      <td>${b.op.toFixed(2)}</td><td>${b.ac.toFixed(2)}</td>
+      <td class="${b.adj>=0?'pos':'neg'}">${b.adj>=0?'+':''}${b.adj.toFixed(2)}</td>
+      <td><strong>${b.earned.toFixed(2)}</strong></td>
+      <td>${b.takenDays.toFixed(2)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <span style="font-weight:600;min-width:38px">${b.remaining.toFixed(2)}</span>
+        <div class="balance-bar"><div class="bfill ${barCls(b.remaining,b.earned)}" style="width:${barPct(b.remaining,b.earned)}%"></div></div>
+      </div></td>
+      <td>${b.takenHrs.toFixed(1)} h</td>
+      <td>${statusBadge(b.remaining)}</td>
+    </tr>`;
+  }).join('');
+  setThClasses('panel-dashboard',bc,bd);
+}
+/* sort state per table */
+const sortState={log:{col:3,dir:-1},adj:{col:2,dir:-1},hol:{col:0,dir:1},bal:{col:0,dir:1}};
+
+function sortRows(rows,col,dir,keys){
+  return rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number') return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
+}
+
+function setThClasses(tableId,activeCol,dir){
+  document.querySelectorAll('#'+tableId+' thead th.sortable').forEach(function(th){
+    th.classList.remove('asc','desc');
+    if(parseInt(th.dataset.col)===activeCol){
+      th.classList.add(dir===1?'asc':'desc');
+    }
+  });
+}
+
+function toggleSort(table,col){
+  if(sortState[table].col===col) sortState[table].dir*=-1;
+  else{sortState[table].col=col;sortState[table].dir=1;}
+  if(table==='log')renderLog();
+  else if(table==='adj')renderAdj();
+  else if(table==='hol')renderHolidays();
+  else if(table==='bal')renderDashboard();
+}
+document.addEventListener('click',function(e){
+  var th=e.target.closest('th.sortable');
+  if(!th)return;
+  var table=th.dataset.table, col=parseInt(th.dataset.col);
+  if(table&&!isNaN(col))toggleSort(table,col);
+});
+
+function renderLog(){
+  const fe=document.getElementById('log-filter-emp').value;
+  const ft=document.getElementById('log-filter-type').value;
+  let rows=(S.leaves||[]).map((l,oi)=>({...l,_oi:oi}));
+  if(fe)rows=rows.filter(l=>l.emp===fe);
+  if(ft)rows=rows.filter(l=>l.type===ft);
+  const keys=['_seq','emp','type','from','to','days','hours','_deducted','_holiday','remarks'];
+  rows=rows.map((l,i)=>({...l,_seq:i,_deducted:l.holiday?-1:l.type==='Hourly Leave'?l.hours/8:parseFloat(l.days||0),_holiday:l.holiday?1:0}));
+  const {col,dir}=sortState.log;
+  rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number')return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
+  document.getElementById('log-tbody').innerHTML=rows.map((l,i)=>{
+    const ded=l.holiday?'<span class="badge badge-hol">Holiday</span>':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days;
+    return`<tr>
+      <td class="muted">${i+1}</td>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(l.emp)}</div><span>${l.emp}</span></div></td>
+      <td>${typeBadge(l.type)}</td>
+      <td style="white-space:nowrap">${fmtDate(l.from)}</td>
+      <td style="white-space:nowrap">${fmtDate(l.to||l.from)}</td>
+      <td>${l.type==='Hourly Leave'?'—':l.days}</td>
+      <td>${l.hours>0?l.hours+' h':'—'}</td>
+      <td>${ded}</td>
+      <td>${l.holiday?'<span class="badge badge-hol">Yes</span>':''}</td>
+      <td class="muted">${l.remarks||''}</td>
+      <td style="white-space:nowrap;display:flex;gap:4px">
+        <button class="btn" style="padding:3px 9px;font-size:11px;color:#1e40af;border-color:#93c5fd" onclick="openEditModal(${l._oi})">Edit</button>
+        <button class="btn btn-danger" onclick="delLeave(${l._oi})">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('log-count').textContent=`${rows.length} entries`;
+  setThClasses('panel-log',col,dir);
+}
+function renderAdj(){
+  const fe=document.getElementById('adj-filter-emp')?document.getElementById('adj-filter-emp').value:'';
+  let rows=(S.adjustments||[]).map((a,oi)=>({...a,_oi:oi,_days:parseFloat(a.days)}));
+  if(fe)rows=rows.filter(a=>a.emp===fe);
+  const keys=['_seq','emp','date','_days','reason'];
+  const {col,dir}=sortState.adj;
+  rows=rows.map((a,i)=>({...a,_seq:i}));
+  rows.sort((a,b)=>{
+    let av=a[keys[col]],bv=b[keys[col]];
+    if(typeof av==='number'&&typeof bv==='number')return dir*(av-bv);
+    return dir*String(av||'').localeCompare(String(bv||''));
+  });
+  document.getElementById('adj-tbody').innerHTML=rows.map((a,i)=>{
+    const pos=a._days>=0;
+    return`<tr>
+      <td class="muted">${i+1}</td>
+      <td><div class="emp-cell"><div class="emp-avatar">${initials(a.emp)}</div><span>${a.emp}</span></div></td>
+      <td style="white-space:nowrap">${fmtDate(a.date)}</td>
+      <td class="${pos?'pos':'neg'}">${pos?'+':''}${a._days.toFixed(2)}</td>
+      <td class="muted">${a.reason||''}</td>
+      <td><button class="btn btn-danger" onclick="delAdj(${a._oi})">Delete</button></td>
+    </tr>`;
+  }).join('');
+  setThClasses('panel-adjustments',col,dir);
+}
+function renderHolidays(){
+  let rows=(S.holidays||[]).map((h,oi)=>({...h,_oi:oi}));
+  const keys=['date','name'];
+  const {col,dir}=sortState.hol;
+  rows.sort((a,b)=>dir*String(a[keys[col]]||'').localeCompare(String(b[keys[col]]||'')));
+  document.getElementById('hol-tbody').innerHTML=rows.map((h,i)=>{
+    return`<tr>
+      <td style="white-space:nowrap">${fmtDate(h.date)}</td>
+      <td>${h.name}</td>
+      <td><button class="btn btn-danger" onclick="delHol(${h._oi})">Delete</button></td>
+    </tr>`;
+  }).join('');
+  setThClasses('panel-holidays',col,dir);
+}
+
+/* ══════════════════════════════════════════════
+   ACTIONS
+══════════════════════════════════════════════ */
+function showAlert(id,msg,type='warn'){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.innerHTML=`<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(()=>{if(el)el.innerHTML='';},5000);
+}
+function toggleHourly(){
+  const isH=document.getElementById('add-type').value==='Hourly Leave';
+  document.getElementById('hourly-block').style.display=isH?'block':'none';
+  document.getElementById('fullday-block').style.display=isH?'none':'block';
+  document.getElementById('days-preview-row').style.display='none';
+}
+function calcDays(){
+  const f=document.getElementById('add-from').value,t=document.getElementById('add-to').value||f;
+  if(f&&t){document.getElementById('add-days-val').value=workingDays(f,t)+' working day(s)';document.getElementById('days-preview-row').style.display='grid';}
+}
+function addLeave(){
+  const emp=document.getElementById('add-emp').value;
+  const type=document.getElementById('add-type').value;
+  const isH=type==='Hourly Leave';
+  const isHolOvr=document.getElementById('add-holiday-override').checked;
+  const remarks=document.getElementById('add-remarks').value.trim();
+  if(!S.leaves)S.leaves=[];
+  if(isH){
+    const date=document.getElementById('add-hourly-date').value;
+    const hours=parseFloat(document.getElementById('add-hours').value);
+    if(!date){showAlert('add-alert','Please select a date.');return;}
+    if(!hours||hours<0.5||hours>7.5||hours%0.5!==0){showAlert('add-alert','Hours must be 0.5–7.5 in 0.5 steps.');return;}
+    S.leaves.push({emp,type,from:date,to:date,days:0,hours,remarks,holiday:isHolOvr});
+  } else {
+    const from=document.getElementById('add-from').value,to=document.getElementById('add-to').value||from;
+    if(!from){showAlert('add-alert','Please select a start date.');return;}
+    const days=workingDays(from,to);
+    if(!isHolOvr){const b=getBalance(emp);if(b.remaining-days<0)showAlert('add-alert',`Warning: ${emp} has ${b.remaining.toFixed(2)} days remaining. This will overdraw their balance.`);}
+    S.leaves.push({emp,type,from,to,days,hours:0,remarks,holiday:isHolOvr});
+  }
+  debounceSave();
+  showAlert('add-alert','Entry saved.','success');
+  ['add-from','add-to','add-hourly-date','add-remarks'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('add-hours').value='1';
+  document.getElementById('add-holiday-override').checked=false;
+  document.getElementById('days-preview-row').style.display='none';
+  renderDashboard();
+}
+function addAdjustment(){
+  const emp=document.getElementById('adj-emp').value;
+  const days=parseFloat(document.getElementById('adj-days').value);
+  const date=document.getElementById('adj-date').value;
+  const reason=document.getElementById('adj-reason').value.trim();
+  const opening=document.getElementById('adj-opening').value;
+  if(!date){showAlert('adj-alert','Please select a date.');return;}
+  if(isNaN(days)&&opening===''){showAlert('adj-alert','Enter days and/or an opening balance.');return;}
+  if(!S.adjustments)S.adjustments=[];if(!S.opening)S.opening={};
+  if(opening!=='')S.opening[emp]=parseFloat(opening);
+  if(!isNaN(days)&&days!==0)S.adjustments.push({emp,date,days,reason});
+  debounceSave();
+  showAlert('adj-alert','Adjustment saved.','success');
+  ['adj-days','adj-date','adj-reason','adj-opening'].forEach(id=>document.getElementById(id).value='');
+  renderDashboard();renderAdj();
+}
+function addHoliday(){
+  const date=document.getElementById('hol-date').value,name=document.getElementById('hol-name').value.trim();
+  if(!date||!name){alert('Please fill in both date and name.');return;}
+  if(!S.holidays)S.holidays=[];
+  if(S.holidays.some(h=>h.date===date)){alert('This date is already a holiday.');return;}
+  S.holidays.push({date,name});debounceSave();
+  document.getElementById('hol-date').value='';document.getElementById('hol-name').value='';
+  renderHolidays();
+}
+function delLeave(i){if(!confirm('Delete this leave entry?'))return;S.leaves.splice(i,1);debounceSave();renderLog();renderDashboard();}
+function delAdj(i){if(!confirm('Delete this adjustment?'))return;S.adjustments.splice(i,1);debounceSave();renderAdj();renderDashboard();}
+function delHol(i){if(!confirm('Remove this holiday?'))return;S.holidays.splice(i,1);debounceSave();renderHolidays();}
+
+/* ══════════════════════════════════════════════
+   EXCEL EXPORT
+══════════════════════════════════════════════ */
+function exportToExcel(){
+  const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const sheets=[
+    {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Total Earned','Taken (days)','Remaining','Hourly Taken','Status'],
+     rows:EMPLOYEES.map(emp=>{const b=getBalance(emp);return[emp,b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenDays.toFixed(2),b.remaining.toFixed(2),b.takenHrs.toFixed(1)+'h',b.remaining<0?'Overdrawn':b.remaining===0?'No Balance':b.remaining<=1?'Low':'OK'];})},
+    {name:'Leave Log',headers:['#','Employee','Type','From','To','Days','Hours','Deducted','Holiday?','Remarks'],
+     rows:[...(S.leaves||[])].sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
+    {name:'Adjustments',headers:['#','Employee','Date','Days','Reason'],
+     rows:[...(S.adjustments||[])].sort((a,b)=>b.date.localeCompare(a.date)).map((a,i)=>[i+1,a.emp,fmtDate(a.date),(parseFloat(a.days)>=0?'+':'')+parseFloat(a.days).toFixed(2),a.reason||''])},
+    {name:'Holidays',headers:['Date','Holiday Name'],
+     rows:[...(S.holidays||[])].sort((a,b)=>a.date.localeCompare(b.date)).map(h=>[fmtDate(h.date),h.name])},
+  ];
+  const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const H='style="background:#1b2a4a;color:#fff;font-weight:bold;border:1px solid #aaa;padding:6px 10px;white-space:nowrap"';
+  const C='style="border:1px solid #dde;padding:5px 10px"';
+  const A='style="background:#f5f7fa;border:1px solid #dde;padding:5px 10px"';
+  let html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>`;
+  sheets.forEach(s=>{html+=`<x:ExcelWorksheet><x:Name>${esc(s.name)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>`;});
+  html+=`</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>`;
+  sheets.forEach(s=>{
+    html+=`<div style="margin-bottom:40px"><div style="background:#1b2a4a;color:#fff;padding:10px 16px;font-weight:bold;font-size:13px;font-family:Arial">AAFETS Leave Management &nbsp;·&nbsp; ${s.name} &nbsp;·&nbsp; Exported: ${today}</div>`;
+    html+=`<table border="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;width:100%"><thead><tr>${s.headers.map(h=>`<th ${H}>${esc(h)}</th>`).join('')}</tr></thead><tbody>`;
+    s.rows.forEach((row,i)=>{html+=`<tr>${row.map(c=>`<td ${i%2===0?C:A}>${esc(c)}</td>`).join('')}</tr>`;});
+    html+=`</tbody></table></div>`;
+  });
+  html+=`</body></html>`;
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='AAFETS_Leave_Export_'+new Date().toISOString().slice(0,10)+'.xls';
+  a.click();URL.revokeObjectURL(url);
+}
+
+/* ══════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════ */
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays'};
+  document.querySelectorAll('.nav button').forEach(b=>{if(b.textContent.trim()===map[id])b.classList.add('active');});
+  if(id==='log')renderLog();
+  if(id==='adjustments')renderAdj();
+  if(id==='holidays')renderHolidays();
+}
+
+
+/* ══════════════════════════════════════════════
+   EDIT LEAVE MODAL
+══════════════════════════════════════════════ */
+function openEditModal(idx){
+  const l=S.leaves[idx];
+  if(!l)return;
+  document.getElementById('edit-idx').value=idx;
+  document.getElementById('edit-emp').value=l.emp;
+  document.getElementById('edit-type').value=l.type;
+  document.getElementById('edit-remarks').value=l.remarks||'';
+  document.getElementById('edit-holiday-override').checked=!!l.holiday;
+  if(l.type==='Hourly Leave'){
+    document.getElementById('edit-hourly-date').value=l.from||'';
+    document.getElementById('edit-hours').value=l.hours||1;
+  } else {
+    document.getElementById('edit-from').value=l.from||'';
+    document.getElementById('edit-to').value=l.to||l.from||'';
+    calcEditDays();
+  }
+  toggleEditHourly();
+  document.getElementById('edit-alert').innerHTML='';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal(){
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function toggleEditHourly(){
+  const isH=document.getElementById('edit-type').value==='Hourly Leave';
+  document.getElementById('edit-hourly-block').style.display=isH?'block':'none';
+  document.getElementById('edit-fullday-block').style.display=isH?'none':'block';
+}
+
+function calcEditDays(){
+  const f=document.getElementById('edit-from').value;
+  const t=document.getElementById('edit-to').value||f;
+  if(f&&t){
+    const d=workingDays(f,t);
+    document.getElementById('edit-days-val').value=d+' working day(s)';
+    document.getElementById('edit-days-preview-row').style.display='grid';
+  }
+}
+
+function saveEdit(){
+  const idx=parseInt(document.getElementById('edit-idx').value);
+  const emp=document.getElementById('edit-emp').value;
+  const type=document.getElementById('edit-type').value;
+  const isH=type==='Hourly Leave';
+  const isHolOvr=document.getElementById('edit-holiday-override').checked;
+  const remarks=document.getElementById('edit-remarks').value.trim();
+
+  if(isH){
+    const date=document.getElementById('edit-hourly-date').value;
+    const hours=parseFloat(document.getElementById('edit-hours').value);
+    if(!date){showAlert('edit-alert','Please select a date.');return;}
+    if(!hours||hours<0.5||hours>7.5||hours%0.5!==0){showAlert('edit-alert','Hours must be 0.5–7.5 in 0.5 steps.');return;}
+    S.leaves[idx]={emp,type,from:date,to:date,days:0,hours,remarks,holiday:isHolOvr};
+  } else {
+    const from=document.getElementById('edit-from').value;
+    const to=document.getElementById('edit-to').value||from;
+    if(!from){showAlert('edit-alert','Please select a start date.');return;}
+    const days=workingDays(from,to);
+    S.leaves[idx]={emp,type,from,to,days,hours:0,remarks,holiday:isHolOvr};
+  }
+
+  debounceSave();
+  closeEditModal();
+  renderLog();
+  renderDashboard();
+}
+
+// Close modal on overlay click
+document.getElementById('edit-modal').addEventListener('click',function(e){
+  if(e.target===this)closeEditModal();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'&&!document.getElementById('edit-modal').classList.contains('hidden'))closeEditModal();
+});
+
+/* ══════════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════════ */
+async function init(){
+  document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  ['add-emp','adj-emp','edit-emp'].forEach(id=>{document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');});
+  ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=`<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
+  });
+  toggleHourly();
+  await loadFromCloud();
+  renderDashboard();
+}
+
+if(sessionStorage.getItem('aafets_unlocked')==='yes'){
+  document.getElementById('pin-screen').classList.add('hidden');
+  pinUnlocked=true;
+  init();
+}
+</script>
+</body>
+</html>
