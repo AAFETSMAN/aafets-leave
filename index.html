@@ -109,6 +109,10 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .modal-close:hover{color:#333}
 .modal-footer{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #f0f2f5}
 
+
+.edit-name-input{width:100%;padding:5px 8px;border:1px solid #93c5fd;border-radius:6px;font-size:13px;font-family:inherit}
+.edit-name-input:focus{outline:none;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+
 </style>
 </head>
 <body>
@@ -168,6 +172,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     <button onclick="showPanel('add')">+ Add Leave</button>
     <button onclick="showPanel('adjustments')">Adjustments</button>
     <button onclick="showPanel('holidays')">Holidays</button>
+    <button onclick="showPanel('team')">Team</button>
   </div>
 
   <!-- DASHBOARD -->
@@ -344,6 +349,35 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
             <th></th>
           </tr></thead>
           <tbody id="hol-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TEAM MANAGEMENT -->
+  <div id="panel-team" class="panel">
+    <div class="card" style="max-width:560px;margin-bottom:1rem">
+      <div class="card-title">Add new employee</div>
+      <div id="team-add-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Full name</label><input type="text" id="new-emp-name" placeholder="e.g. Ahmed Hassan"></div>
+        <div class="field"><label>Opening balance (days)</label><input type="number" id="new-emp-balance" step="0.5" min="0" value="0"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="addEmployee()">Add employee</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Team members</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Employee</th>
+            <th>Opening balance</th>
+            <th>Actions</th>
+          </tr></thead>
+          <tbody id="team-tbody"></tbody>
         </table>
       </div>
     </div>
@@ -541,7 +575,7 @@ function updateDots(err){
 }
 function checkPin(){
   if(pinEntry===PIN_CODE){
-    sessionStorage.setItem('aafets_unlocked','yes');
+    localStorage.setItem('aafets_unlocked', Date.now().toString());
     document.getElementById('pin-screen').classList.add('hidden');
     pinUnlocked=true;
     init();
@@ -606,24 +640,21 @@ function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':
    RENDER
 ══════════════════════════════════════════════ */
 function renderDashboard(){
-  const overdrawn=EMPLOYEES.filter(e=>getBalance(e).remaining<0).length;
-  const low=EMPLOYEES.filter(e=>{const b=getBalance(e);return b.remaining>=0&&b.remaining<=1;}).length;
+  const overdrawn=getEmployees().filter(e=>getBalance(e).remaining<0).length;
+  const low=getEmployees().filter(e=>{const b=getBalance(e);return b.remaining>=0&&b.remaining<=1;}).length;
   document.getElementById('dash-metrics').innerHTML=`
-    <div class="metric"><div class="lbl">Team members</div><div class="val">${EMPLOYEES.length}</div></div>
+    <div class="metric"><div class="lbl">Team members</div><div class="val">${getEmployees().length}</div></div>
     <div class="metric"><div class="lbl">Overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
     <div class="metric"><div class="lbl">Low balance (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
     <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
-  let balRows=EMPLOYEES.map(emp=>{const b=getBalance(emp);return{emp,...b};});
-  if(feB)balRows=balRows.filter(r=>r.emp===feB);
-  const balKeys=['emp','op','ac','adj','earned','takenDays','remaining','takenHrs','_status'];
-  balRows=balRows.map(r=>({...r,_status:r.remaining<0?0:r.remaining===0?1:r.remaining<=1?2:3}));
-  const {col:bc,dir:bd}=sortState.bal;
-  balRows.sort((a,b)=>{
-    let av=a[balKeys[bc]],bv=b[balKeys[bc]];
-    if(typeof av==='number'&&typeof bv==='number')return bd*(av-bv);
-    return bd*String(av||'').localeCompare(String(bv||''));
-  });
+  let balRows2=getEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
+  if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
+  const balKeys2=['emp','op','ac','adj','earned','takenDays','remaining','takenHrs','_status'];
+  balRows2=balRows2.map(r=>({...r,_status:r.remaining<0?0:r.remaining===0?1:r.remaining<=1?2:3}));
+  const {col:bc2,dir:bd2}=sortState.bal;
+  balRows2.sort((a,b)=>{let av=a[balKeys2[bc2]],bv=b[balKeys2[bc2]];if(typeof av==='number'&&typeof bv==='number')return bd2*(av-bv);return bd2*String(av||'').localeCompare(String(bv||''));});
+  const balRows=balRows2;
   document.getElementById('balance-tbody').innerHTML=balRows.map(r=>{
     const b=r;
     return`<tr>
@@ -872,11 +903,12 @@ function showPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
-  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays'};
+  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays',team:'Team'};
   document.querySelectorAll('.nav button').forEach(b=>{if(b.textContent.trim()===map[id])b.classList.add('active');});
   if(id==='log')renderLog();
   if(id==='adjustments')renderAdj();
   if(id==='holidays')renderHolidays();
+  if(id==='team')renderTeam();
 }
 
 
@@ -962,22 +994,139 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&!document.getElementById('edit-modal').classList.contains('hidden'))closeEditModal();
 });
 
+
+/* ══════════════════════════════════════════════
+   TEAM MANAGEMENT
+══════════════════════════════════════════════ */
+function getEmployees(){
+  return S.employees && S.employees.length > 0 ? S.employees : [...EMPLOYEES];
+}
+
+function renderTeam(){
+  const emps = getEmployees();
+  document.getElementById('team-tbody').innerHTML = emps.map((emp,i) => {
+    const b = getBalance(emp);
+    const op = parseFloat((S.opening||{})[emp]||0);
+    return `<tr id="team-row-${i}">
+      <td style="font-weight:500">${emp}</td>
+      <td>${op.toFixed(2)} days</td>
+      <td style="white-space:nowrap;display:flex;gap:4px">
+        <button class="btn" style="padding:3px 9px;font-size:11px;color:#1e40af;border-color:#93c5fd" onclick="startEditEmployee(${i})">Edit</button>
+        <button class="btn btn-danger" onclick="removeEmployee('${emp}')">Remove</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function startEditEmployee(i){
+  const emps = getEmployees();
+  const emp = emps[i];
+  const op = parseFloat((S.opening||{})[emp]||0);
+  document.getElementById('team-row-'+i).innerHTML = `
+    <td><input class="edit-name-input" id="edit-emp-name-${i}" value="${emp}"></td>
+    <td><input class="edit-name-input" id="edit-emp-bal-${i}" type="number" step="0.5" min="0" value="${op}" style="width:100px"></td>
+    <td style="white-space:nowrap;display:flex;gap:4px">
+      <button class="btn btn-primary" style="padding:3px 9px;font-size:11px" onclick="saveEditEmployee(${i},'${emp}')">Save</button>
+      <button class="btn" style="padding:3px 9px;font-size:11px" onclick="renderTeam()">Cancel</button>
+    </td>`;
+}
+
+function saveEditEmployee(i, oldName){
+  const newName = document.getElementById('edit-emp-name-'+i).value.trim();
+  const newBal  = parseFloat(document.getElementById('edit-emp-bal-'+i).value)||0;
+  if(!newName){ alert('Name cannot be empty.'); return; }
+  const emps = getEmployees();
+  if(newName !== oldName && emps.includes(newName)){ alert('An employee with this name already exists.'); return; }
+
+  // Update name in employees list
+  S.employees = emps.map(e => e===oldName ? newName : e);
+
+  // Update opening balance
+  if(!S.opening) S.opening={};
+  S.opening[newName] = newBal;
+  if(newName !== oldName) delete S.opening[oldName];
+
+  // Update name in leaves
+  (S.leaves||[]).forEach(l=>{ if(l.emp===oldName) l.emp=newName; });
+  // Update name in adjustments
+  (S.adjustments||[]).forEach(a=>{ if(a.emp===oldName) a.emp=newName; });
+
+  debounceSave();
+  refreshAllDropdowns();
+  renderTeam();
+  renderDashboard();
+  showAlert('team-add-alert', newName !== oldName
+    ? `Employee renamed from "${oldName}" to "${newName}" and all records updated.`
+    : `Opening balance updated for ${newName}.`, 'success');
+}
+
+function addEmployee(){
+  const name  = document.getElementById('new-emp-name').value.trim();
+  const bal   = parseFloat(document.getElementById('new-emp-balance').value)||0;
+  if(!name){ showAlert('team-add-alert','Please enter a name.'); return; }
+  const emps = getEmployees();
+  if(emps.includes(name)){ showAlert('team-add-alert','An employee with this name already exists.'); return; }
+
+  if(!S.employees) S.employees = [...EMPLOYEES];
+  S.employees.push(name);
+  if(!S.opening) S.opening={};
+  S.opening[name] = bal;
+
+  debounceSave();
+  refreshAllDropdowns();
+  renderTeam();
+  renderDashboard();
+  document.getElementById('new-emp-name').value='';
+  document.getElementById('new-emp-balance').value='0';
+  showAlert('team-add-alert', `${name} added successfully.`, 'success');
+}
+
+function removeEmployee(emp){
+  const hasLeaves = (S.leaves||[]).some(l=>l.emp===emp);
+  const hasAdj    = (S.adjustments||[]).some(a=>a.emp===emp);
+  let msg = `Remove ${emp} from the team?`;
+  if(hasLeaves||hasAdj) msg += `
+
+Warning: this employee has existing leave records and/or adjustments. They will be kept in the log for historical reference but ${emp} will no longer appear in the active team list.`;
+  if(!confirm(msg)) return;
+
+  if(!S.employees) S.employees = [...EMPLOYEES];
+  S.employees = S.employees.filter(e=>e!==emp);
+  debounceSave();
+  refreshAllDropdowns();
+  renderTeam();
+  renderDashboard();
+}
+
+function refreshAllDropdowns(){
+  const emps = getEmployees();
+  const empOptions = emps.map(e=>`<option>${e}</option>`).join('');
+  const filterOptions = `<option value="">All employees</option>` + empOptions;
+  ['add-emp','adj-emp','edit-emp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML=empOptions;
+  });
+  ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML=filterOptions;
+  });
+}
+
 /* ══════════════════════════════════════════════
    BOOT
 ══════════════════════════════════════════════ */
 async function init(){
   document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  ['add-emp','adj-emp','edit-emp'].forEach(id=>{document.getElementById(id).innerHTML=EMPLOYEES.map(e=>`<option>${e}</option>`).join('');});
-  ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el)el.innerHTML=`<option value="">All employees</option>`+EMPLOYEES.map(e=>`<option>${e}</option>`).join('');
-  });
+  refreshAllDropdowns();
   toggleHourly();
   await loadFromCloud();
   renderDashboard();
 }
 
-if(sessionStorage.getItem('aafets_unlocked')==='yes'){
+// Check PIN session — valid for 8 hours
+const _pinTs = parseInt(localStorage.getItem('aafets_unlocked')||'0');
+const _pinValid = (Date.now() - _pinTs) < 8 * 60 * 60 * 1000;
+if(_pinValid){
   document.getElementById('pin-screen').classList.add('hidden');
   pinUnlocked=true;
   init();
