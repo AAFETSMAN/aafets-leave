@@ -22,7 +22,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;fo
 .panel{display:none}.panel.active{display:block}
 .card{background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
 .card-title{font-size:14px;font-weight:600;color:#1b2a4a;margin-bottom:12px}
-.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:1rem}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:1rem}
 .metric{background:#f5f7fa;border-radius:10px;padding:14px 16px;border:1px solid #e8ecf2}
 .metric .lbl{font-size:12px;color:#888;margin-bottom:6px;font-weight:500}
 .metric .val{font-size:26px;font-weight:700;color:#1b2a4a}
@@ -194,11 +194,15 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
             <th class="sortable" data-col="1" data-table="bal">Opening</th>
             <th class="sortable" data-col="2" data-table="bal">Accrued</th>
             <th class="sortable" data-col="3" data-table="bal">Adjustments</th>
-            <th class="sortable" data-col="4" data-table="bal">Total earned</th>
-            <th class="sortable" data-col="5" data-table="bal">Taken (days)</th>
-            <th class="sortable" data-col="6" data-table="bal">Remaining</th>
-            <th class="sortable" data-col="7" data-table="bal">Hourly taken</th>
-            <th class="sortable" data-col="8" data-table="bal">Status</th>
+            <th class="sortable" data-col="4" data-table="bal">Annual Earned</th>
+            <th class="sortable" data-col="5" data-table="bal">Annual Taken</th>
+            <th class="sortable" data-col="6" data-table="bal">Annual Remaining</th>
+            <th class="sortable" data-col="7" data-table="bal">Hourly Taken</th>
+            <th class="sortable" data-col="8" data-table="bal">Sick Entitlement</th>
+            <th class="sortable" data-col="9" data-table="bal">Sick Taken</th>
+            <th class="sortable" data-col="10" data-table="bal">Sick Remaining</th>
+            <th class="sortable" data-col="11" data-table="bal">Annual Status</th>
+            <th class="sortable" data-col="12" data-table="bal">Sick Status</th>
           </tr></thead>
           <tbody id="balance-tbody"></tbody>
         </table>
@@ -655,20 +659,45 @@ function workingDays(fromStr,toStr){
   return n;
 }
 function accrued(){return parseFloat((new Date().getMonth()*ACCRUAL).toFixed(4));}
+const SICK_ENTITLEMENT = 30;
+
 function getBalance(emp){
   const op=parseFloat((S.opening||{})[emp]||0);
   const ac=accrued();
   const adj=(S.adjustments||[]).filter(a=>a.emp===emp).reduce((s,a)=>s+parseFloat(a.days),0);
-  const takenDays=(S.leaves||[]).filter(l=>l.emp===emp&&l.type!=='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
+
+  // Annual leave: excludes sick leave entries
+  const takenAnnual=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Annual Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
+  // Hourly leave deducts from annual
   const takenHrs=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.hours||0),0);
+  const takenHrsDays=takenHrs/8;
+
+  // Sick leave: separate 30-day entitlement
+  const takenSick=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Sick Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
+  const sickRemaining=SICK_ENTITLEMENT-takenSick;
+
   const earned=op+ac+adj;
-  return{op,ac,adj,earned,takenDays,takenHrs,remaining:earned-takenDays};
+  const annualTaken=takenAnnual+takenHrsDays;
+  const annualRemaining=earned-annualTaken;
+
+  return{
+    op,ac,adj,earned,
+    takenAnnual,takenHrsDays,takenHrs,
+    annualRemaining,
+    takenSick,sickRemaining
+  };
 }
 function initials(n){return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function fmtDate(d){
   if(!d)return'';
   const p=d.split('-'),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return`${p[2]}-${m[parseInt(p[1])-1]}-${p[0]}`;
+}
+function sickStatusBadge(r){
+  if(r<0) return`<span class="badge badge-over">Overdrawn</span>`;
+  if(r===0)return`<span class="badge badge-over">No balance</span>`;
+  if(r<=5) return`<span class="badge badge-low">Low</span>`;
+  return`<span class="badge badge-ok">OK</span>`;
 }
 function statusBadge(r){
   if(r<0) return`<span class="badge badge-over">Overdrawn</span>`;
@@ -688,18 +717,20 @@ function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':
    RENDER
 ══════════════════════════════════════════════ */
 function renderDashboard(){
-  const overdrawn=getEmployees().filter(e=>getBalance(e).remaining<0).length;
-  const low=getEmployees().filter(e=>{const b=getBalance(e);return b.remaining>=0&&b.remaining<=1;}).length;
+  const overdrawn=getEmployees().filter(e=>getBalance(e).annualRemaining<0).length;
+  const low=getEmployees().filter(e=>{const b=getBalance(e);return b.annualRemaining>=0&&b.annualRemaining<=1;}).length;
+  const sickLow=getEmployees().filter(e=>getBalance(e).sickRemaining<=5).length;
   document.getElementById('dash-metrics').innerHTML=`
     <div class="metric"><div class="lbl">Team members</div><div class="val">${getEmployees().length}</div></div>
-    <div class="metric"><div class="lbl">Overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
-    <div class="metric"><div class="lbl">Low balance (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
+    <div class="metric"><div class="lbl">Annual overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
+    <div class="metric"><div class="lbl">Annual low (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
+    <div class="metric"><div class="lbl">Sick low (≤5 days)</div><div class="val" style="color:#d97706">${sickLow}</div></div>
     <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
   let balRows2=getEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
   if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
-  const balKeys2=['emp','op','ac','adj','earned','takenDays','remaining','takenHrs','_status'];
-  balRows2=balRows2.map(r=>({...r,_status:r.remaining<0?0:r.remaining===0?1:r.remaining<=1?2:3}));
+  const balKeys2=['emp','op','ac','adj','earned','takenAnnual','annualRemaining','takenHrs','_sickEnt','takenSick','sickRemaining','_status','_sickStatus'];
+  balRows2=balRows2.map(r=>({...r,_sickEnt:30,_status:r.annualRemaining<0?0:r.annualRemaining===0?1:r.annualRemaining<=1?2:3,_sickStatus:r.sickRemaining<0?0:r.sickRemaining===0?1:r.sickRemaining<=5?2:3}));
   const {col:bc2,dir:bd2}=sortState.bal;
   balRows2.sort((a,b)=>{let av=a[balKeys2[bc2]],bv=b[balKeys2[bc2]];if(typeof av==='number'&&typeof bv==='number')return bd2*(av-bv);return bd2*String(av||'').localeCompare(String(bv||''));});
   const balRows=balRows2;
@@ -707,16 +738,24 @@ function renderDashboard(){
     const b=r;
     return`<tr>
       <td><div class="emp-cell"><div class="emp-avatar">${initials(b.emp)}</div><span style="font-weight:500">${b.emp}</span></div></td>
-      <td>${b.op.toFixed(2)}</td><td>${b.ac.toFixed(2)}</td>
+      <td>${b.op.toFixed(2)}</td>
+      <td>${b.ac.toFixed(2)}</td>
       <td class="${b.adj>=0?'pos':'neg'}">${b.adj>=0?'+':''}${b.adj.toFixed(2)}</td>
       <td><strong>${b.earned.toFixed(2)}</strong></td>
-      <td>${b.takenDays.toFixed(2)}</td>
+      <td>${b.takenAnnual.toFixed(2)}</td>
       <td><div style="display:flex;align-items:center;gap:8px">
-        <span style="font-weight:600;min-width:38px">${b.remaining.toFixed(2)}</span>
-        <div class="balance-bar"><div class="bfill ${barCls(b.remaining,b.earned)}" style="width:${barPct(b.remaining,b.earned)}%"></div></div>
+        <span style="font-weight:600;min-width:38px">${b.annualRemaining.toFixed(2)}</span>
+        <div class="balance-bar"><div class="bfill ${barCls(b.annualRemaining,b.earned)}" style="width:${barPct(b.annualRemaining,b.earned)}%"></div></div>
       </div></td>
       <td>${b.takenHrs.toFixed(1)} h</td>
-      <td>${statusBadge(b.remaining)}</td>
+      <td style="text-align:center">30</td>
+      <td>${b.takenSick.toFixed(2)}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <span style="font-weight:600;min-width:38px;color:${b.sickRemaining<0?'#dc2626':b.sickRemaining<=5?'#d97706':'inherit'}">${b.sickRemaining.toFixed(2)}</span>
+        <div class="balance-bar"><div class="bfill ${barCls(b.sickRemaining,30)}" style="width:${barPct(b.sickRemaining,30)}%"></div></div>
+      </div></td>
+      <td>${statusBadge(b.annualRemaining)}</td>
+      <td>${sickStatusBadge(b.sickRemaining)}</td>
     </tr>`;
   }).join('');
   setThClasses('panel-dashboard',bc,bd);
@@ -914,8 +953,8 @@ function delHol(i){if(!confirm('Remove this holiday?'))return;S.holidays.splice(
 function exportToExcel(){
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
   const sheets=[
-    {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Total Earned','Taken (days)','Remaining','Hourly Taken','Status'],
-     rows:EMPLOYEES.map(emp=>{const b=getBalance(emp);return[emp,b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenDays.toFixed(2),b.remaining.toFixed(2),b.takenHrs.toFixed(1)+'h',b.remaining<0?'Overdrawn':b.remaining===0?'No Balance':b.remaining<=1?'Low':'OK'];})},
+    {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Annual Earned','Annual Taken','Annual Remaining','Hourly Taken','Sick Entitlement','Sick Taken','Sick Remaining','Annual Status','Sick Status'],
+     rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp,b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=1?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
     {name:'Leave Log',headers:['#','Employee','Type','From','To','Days','Hours','Deducted','Holiday?','Remarks'],
      rows:[...(S.leaves||[])].sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
     {name:'Adjustments',headers:['#','Employee','Date','Days','Reason'],
