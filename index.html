@@ -191,18 +191,14 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
         <table>
           <thead><tr>
             <th class="sortable" data-col="0" data-table="bal">Employee</th>
-            <th class="sortable" data-col="1" data-table="bal">Opening</th>
-            <th class="sortable" data-col="2" data-table="bal">Accrued</th>
-            <th class="sortable" data-col="3" data-table="bal">Adjustments</th>
-            <th class="sortable" data-col="4" data-table="bal">Annual Earned</th>
-            <th class="sortable" data-col="5" data-table="bal">Annual Taken</th>
-            <th class="sortable" data-col="6" data-table="bal">Annual Remaining</th>
-            <th class="sortable" data-col="7" data-table="bal">Hourly Taken</th>
-            <th class="sortable" data-col="8" data-table="bal">Sick Entitlement</th>
-            <th class="sortable" data-col="9" data-table="bal">Sick Taken</th>
-            <th class="sortable" data-col="10" data-table="bal">Sick Remaining</th>
-            <th class="sortable" data-col="11" data-table="bal">Annual Status</th>
-            <th class="sortable" data-col="12" data-table="bal">Sick Status</th>
+            <th class="sortable" data-col="1" data-table="bal">Annual Remaining</th>
+            <th class="sortable" data-col="2" data-table="bal">Annual Taken</th>
+            <th class="sortable" data-col="3" data-table="bal">Hourly Taken</th>
+            <th class="sortable" data-col="4" data-table="bal">Annual Accrued</th>
+            <th class="sortable" data-col="5" data-table="bal">Sick Remaining</th>
+            <th class="sortable" data-col="6" data-table="bal">Sick Taken</th>
+            <th class="sortable" data-col="7" data-table="bal">Annual Status</th>
+            <th class="sortable" data-col="8" data-table="bal">Sick Status</th>
           </tr></thead>
           <tbody id="balance-tbody"></tbody>
         </table>
@@ -729,7 +725,7 @@ function renderDashboard(){
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
   let balRows2=getEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
   if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
-  const balKeys2=['emp','op','ac','adj','earned','takenAnnual','annualRemaining','takenHrs','_sickEnt','takenSick','sickRemaining','_status','_sickStatus'];
+  const balKeys2=['emp','annualRemaining','takenAnnual','takenHrs','ac','sickRemaining','takenSick','_status','_sickStatus'];
   balRows2=balRows2.map(r=>({...r,_sickEnt:30,_status:r.annualRemaining<0?0:r.annualRemaining===0?1:r.annualRemaining<=1?2:3,_sickStatus:r.sickRemaining<0?0:r.sickRemaining===0?1:r.sickRemaining<=5?2:3}));
   const {col:bc2,dir:bd2}=sortState.bal;
   balRows2.sort((a,b)=>{let av=a[balKeys2[bc2]],bv=b[balKeys2[bc2]];if(typeof av==='number'&&typeof bv==='number')return bd2*(av-bv);return bd2*String(av||'').localeCompare(String(bv||''));});
@@ -738,22 +734,18 @@ function renderDashboard(){
     const b=r;
     return`<tr>
       <td><div class="emp-cell"><div class="emp-avatar">${initials(b.emp)}</div><span style="font-weight:500">${b.emp}</span></div></td>
-      <td>${b.op.toFixed(2)}</td>
-      <td>${b.ac.toFixed(2)}</td>
-      <td class="${b.adj>=0?'pos':'neg'}">${b.adj>=0?'+':''}${b.adj.toFixed(2)}</td>
-      <td><strong>${b.earned.toFixed(2)}</strong></td>
-      <td>${b.takenAnnual.toFixed(2)}</td>
       <td><div style="display:flex;align-items:center;gap:8px">
         <span style="font-weight:600;min-width:38px">${b.annualRemaining.toFixed(2)}</span>
         <div class="balance-bar"><div class="bfill ${barCls(b.annualRemaining,b.earned)}" style="width:${barPct(b.annualRemaining,b.earned)}%"></div></div>
       </div></td>
-      <td>${b.takenHrs.toFixed(1)} h</td>
-      <td style="text-align:center">30</td>
-      <td>${b.takenSick.toFixed(2)}</td>
+      <td>${b.takenAnnual.toFixed(2)}</td>
+      <td style="color:#888;font-size:12px">${b.takenHrs.toFixed(1)} h</td>
+      <td>${b.ac.toFixed(2)}</td>
       <td><div style="display:flex;align-items:center;gap:8px">
-        <span style="font-weight:600;min-width:38px;color:${b.sickRemaining<0?'#dc2626':b.sickRemaining<=5?'#d97706':'inherit'}">${b.sickRemaining.toFixed(2)}</span>
+        <span style="font-weight:600;min-width:38px">${b.sickRemaining.toFixed(2)}</span>
         <div class="balance-bar"><div class="bfill ${barCls(b.sickRemaining,30)}" style="width:${barPct(b.sickRemaining,30)}%"></div></div>
       </div></td>
+      <td>${b.takenSick.toFixed(2)}</td>
       <td>${statusBadge(b.annualRemaining)}</td>
       <td>${sickStatusBadge(b.sickRemaining)}</td>
     </tr>`;
