@@ -113,6 +113,19 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .edit-name-input{width:100%;padding:5px 8px;border:1px solid #93c5fd;border-radius:6px;font-size:13px;font-family:inherit}
 .edit-name-input:focus{outline:none;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
 
+.print-only{display:none}
+@media print{
+  body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .topbar,.nav,.filter-row,#pin-screen,.modal-overlay,#sync-badge{display:none!important}
+  .panel{display:none!important}
+  #panel-report{display:block!important}
+  #panel-report .card{border:none!important;box-shadow:none!important;padding:0!important}
+  #panel-report .page-header{display:none!important}
+  .print-only{display:block!important}
+  .tbl-wrap{overflow:visible!important}
+  tr{page-break-inside:avoid}
+  thead{display:table-header-group}
+}
 </style>
 </head>
 <body>
@@ -396,6 +409,10 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       </div>
       <div id="report-empty" class="muted">Select an employee to view their report.</div>
       <div id="report-body" style="display:none">
+        <div class="print-only" style="margin-bottom:14px">
+          <div style="font-size:18px;font-weight:600">AAFETS — Employee Leave Report</div>
+          <div id="report-print-sub" style="font-size:13px;color:#555;margin-top:2px"></div>
+        </div>
         <div class="grid4" id="report-metrics"></div>
         <div class="card-title" style="margin-top:8px">Leave history</div>
         <div class="tbl-wrap">
@@ -1078,6 +1095,7 @@ function renderReport(){
   empty.style.display='none';body.style.display='block';
 
   const b=getBalance(emp);
+  document.getElementById('report-print-sub').textContent=emp+'  ·  Printed '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   document.getElementById('report-metrics').innerHTML=`
     <div class="metric"><div class="lbl">Annual remaining</div><div class="val">${b.annualRemaining.toFixed(2)}</div></div>
     <div class="metric"><div class="lbl">Annual taken</div><div class="val">${b.takenAnnual.toFixed(2)}</div></div>
