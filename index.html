@@ -113,6 +113,31 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .edit-name-input{width:100%;padding:5px 8px;border:1px solid #93c5fd;border-radius:6px;font-size:13px;font-family:inherit}
 .edit-name-input:focus{outline:none;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
 
+@media print{
+  body{background:#fff}
+  .topbar,.nav,.no-print,#cloud-banner,#pin-screen,.sync-status{display:none!important}
+  .panel{display:none!important}
+  #panel-report{display:block!important}
+  .app{padding:0;max-width:none}
+  .card{break-inside:avoid;box-shadow:none}
+  @page{margin:12mm}
+}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-h{font-size:11px;font-weight:600;color:#667;text-align:center;padding:4px 0}
+.cal-d{min-height:96px;background:#fff;border:1px solid #e0e6ef;border-radius:8px;padding:4px;font-size:11px}
+.cal-d.blank{background:transparent;border:none}
+.cal-d.we{background:#f3f4f6}
+.cal-d.hol{background:#f0fdf4}
+.cal-d.mid{outline:2px solid #fbbf24}
+.cal-d.hi{outline:2px solid #ef4444}
+.cal-d.today{border-color:#1b2a4a;box-shadow:inset 0 0 0 1px #1b2a4a}
+.cal-n{font-weight:600;color:#1b2a4a;display:flex;justify-content:space-between}
+.cal-hn{color:#166534;font-size:10px;line-height:1.2}
+.cal-chip{display:block;border-radius:4px;padding:1px 4px;margin-top:2px;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.rep-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem}
+@media(max-width:700px){.rep-grid{grid-template-columns:repeat(2,1fr)}}
+.rep-kv td:first-child{color:#666;width:55%}
+.rep-kv td:last-child{font-weight:600;text-align:right}
 </style>
 </head>
 <body>
@@ -160,6 +185,8 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="topbar-sub">IT Operations Team &nbsp;·&nbsp; Supervisor View &nbsp;·&nbsp; <span id="cur-date"></span></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label style="color:#cbd5e1;font-size:12px">Year</label>
+      <select id="year-sel" onchange="setYear(this.value)" style="padding:5px 8px;border-radius:8px;border:1px solid #d0d7e2;font-size:12px;background:#fff;color:#1b2a4a"></select>
       <span id="sync-badge" class="sync-status sync-ok">Synced</span>
       <button class="btn" style="padding:5px 12px;font-size:12px" onclick="forcSync()">&#8635; Sync</button>
       <button class="btn" style="padding:5px 12px;font-size:12px;background:#1e6b3e;color:#fff;border-color:#1e6b3e" onclick="exportToExcel()">&#8595; Export Excel</button>
@@ -172,7 +199,10 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     <button onclick="showPanel('add')">+ Add Leave</button>
     <button onclick="showPanel('adjustments')">Adjustments</button>
     <button onclick="showPanel('holidays')">Holidays</button>
+    <button onclick="showPanel('calendar')">Calendar</button>
+    <button onclick="showPanel('report')">Employee Report</button>
     <button onclick="showPanel('team')">Team</button>
+    <button onclick="showPanel('settings')">Settings</button>
   </div>
 
   <!-- DASHBOARD -->
@@ -180,7 +210,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     <div class="grid4" id="dash-metrics"></div>
     <div class="card">
       <div class="page-header">
-        <div class="card-title" style="margin:0">Employee leave balances</div>
+        <div class="card-title" style="margin:0">Employee leave balances <span id="dash-year" style="color:#888;font-weight:400"></span></div>
         <div class="filter-row">
           <select id="bal-filter-emp" onchange="renderDashboard()" style="width:180px">
             <option value="">All employees</option>
@@ -247,7 +277,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="card-title">New leave entry</div>
       <div id="add-alert"></div>
       <div class="form-row">
-        <div class="field"><label>Employee</label><select id="add-emp"></select></div>
+        <div class="field"><label>Employee</label><select id="add-emp" onchange="checkOverlap()"></select></div>
         <div class="field">
           <label>Leave type</label>
           <select id="add-type" onchange="toggleHourly()">
@@ -266,10 +296,11 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       </div>
       <div id="hourly-block" style="display:none">
         <div class="form-row">
-          <div class="field"><label>Date</label><input type="date" id="add-hourly-date"></div>
+          <div class="field"><label>Date</label><input type="date" id="add-hourly-date" onchange="checkOverlap()"></div>
           <div class="field"><label>Hours (0.5–7.5 in 0.5 steps)</label><input type="number" id="add-hours" min="0.5" max="7.5" step="0.5" value="1"></div>
         </div>
       </div>
+      <div id="add-overlap"></div>
       <div class="form-row">
         <div class="field"><label>Remarks (optional)</label><input type="text" id="add-remarks" placeholder="e.g. Medical appointment"></div>
       </div>
@@ -296,12 +327,28 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       </div>
       <div class="form-row">
         <div class="field"><label>Date</label><input type="date" id="adj-date"></div>
-        <div class="field"><label>Override opening balance (optional)</label><input type="number" id="adj-opening" step="0.5" placeholder="Leave blank to keep current (3.00)"></div>
+        <div class="field"><label>Override opening balance for 2026 (optional)</label><input type="number" id="adj-opening" step="0.5" placeholder="Leave blank to keep current (3.00)"></div>
       </div>
       <div class="form-row">
         <div class="field"><label>Reason</label><input type="text" id="adj-reason" placeholder="e.g. Worked on Eid 18-Mar"></div>
       </div>
       <div class="actions"><button class="btn btn-primary" onclick="addAdjustment()">Save adjustment</button></div>
+    </div>
+    <div class="card" style="max-width:660px;margin-bottom:1rem">
+      <div class="card-title">Comp days for working a holiday</div>
+      <div class="info-box">Pick a holiday, tick who worked it, and credit them in one go. People already credited for that date are skipped.</div>
+      <div id="comp-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Holiday</label><select id="comp-hol" onchange="compSelect()"></select></div>
+        <div class="field"><label>Days per person</label><input type="number" id="comp-days" step="0.25" min="0.25" value="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Date</label><input type="date" id="comp-date" onchange="updateCompChecks()"></div>
+        <div class="field"><label>Holiday name (used in the reason)</label><input type="text" id="comp-name" placeholder="e.g. Eid Ala'dhha"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px"><label>Who worked it &nbsp;<a href="#" onclick="compAll(true);return false" style="font-size:11px">all</a> &nbsp;<a href="#" onclick="compAll(false);return false" style="font-size:11px">none</a></label>
+        <div id="comp-emps" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px"></div></div>
+      <div class="actions"><button class="btn btn-primary" onclick="applyComp()">Credit comp days</button></div>
     </div>
     <div class="card">
       <div class="page-header">
@@ -355,6 +402,65 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
   </div>
 
 
+  <!-- EMPLOYEE REPORT -->
+  <div id="panel-report" class="panel">
+    <div class="card no-print" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px;font-weight:600;color:#1b2a4a">Employee</label>
+      <select id="rep-emp" onchange="renderReport()" style="padding:7px 10px;border:1px solid #d0d7e2;border-radius:8px;font-size:13px;width:auto;min-width:200px;max-width:320px"></select>
+      <button class="btn btn-primary" onclick="window.print()">&#128424; Print / Save PDF</button>
+      <button class="btn" style="background:#1e6b3e;color:#fff;border-color:#1e6b3e" onclick="exportEmployeeReport()">&#8595; Excel</button>
+    </div>
+    <div id="rep-body"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="panel-calendar" class="panel">
+    <div class="card">
+      <div class="page-header">
+        <div class="card-title" style="margin:0" id="cal-title">Team calendar</div>
+        <div class="filter-row">
+          <button class="btn" onclick="calNav(-1)">&#9664;</button>
+          <button class="btn" onclick="calNav(0)">Today</button>
+          <button class="btn" onclick="calNav(1)">&#9654;</button>
+        </div>
+      </div>
+      <div id="cal-summary" style="font-size:12px;color:#666;margin-bottom:8px"></div>
+      <div style="overflow-x:auto"><div id="cal-grid" style="min-width:720px"></div></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#666;margin-top:10px">
+        <span><span class="cal-chip" style="display:inline-block;background:#dbeafe;color:#1e40af">Annual</span></span>
+        <span><span class="cal-chip" style="display:inline-block;background:#fef3c7;color:#92400e">Sick</span></span>
+        <span><span class="cal-chip" style="display:inline-block;background:#ede9fe;color:#5b21b6">Hourly</span></span>
+        <span>&#9632; <span style="color:#d97706">amber outline</span> = 2 off &nbsp; <span style="color:#dc2626">red outline</span> = 3+ off &nbsp; green = public holiday &nbsp; grey = weekend (Fri/Sat). Click a chip to edit.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div id="panel-settings" class="panel">
+    <div class="card" style="max-width:760px;margin-bottom:1rem">
+      <div class="card-title">Year rollover</div>
+      <div class="info-box">Rule: on 1 January every balance resets to 0 (annual accrual of 1.75 per month restarts, sick leave returns to 30). Overdrawn balances reset to 0 too. The cap below is 0 by default; only raise it if the rule ever changes. Use the Year selector at the top to look at past years.</div>
+      <div id="set-alert"></div>
+      <div class="form-row">
+        <div class="field"><label>Max annual days carried into next year (rule: 0)</label><input type="number" id="set-cap" min="0" step="0.5"></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" onclick="saveSettings()">Save</button></div>
+    </div>
+    <div class="card" style="max-width:760px;margin-bottom:1rem">
+      <div class="card-title" id="set-prev-title">Carry-over preview</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Employee</th><th>Year-end balance</th><th>Carries over</th><th>Lost to cap</th></tr></thead><tbody id="set-prev-body"></tbody></table></div>
+      <div style="font-size:11px;color:#999;margin-top:6px" id="set-prev-note"></div>
+    </div>
+    <div class="card" style="max-width:760px">
+      <div class="card-title">Backup &amp; restore</div>
+      <div class="info-box">Download a full copy of all data (leaves, adjustments, holidays, team, settings). Restoring replaces everything in the cloud with the file&#39;s contents, and downloads a safety copy of the current data first.</div>
+      <div id="backup-alert"></div>
+      <div class="actions" style="margin-bottom:14px"><button class="btn btn-primary" onclick="downloadBackup()">&#8595; Download backup</button></div>
+      <div class="field"><label>Restore from a backup file</label><input type="file" id="restore-file" accept=".json,application/json" onchange="onRestoreFile(event)"></div>
+      <div id="restore-preview" style="margin-top:10px"></div>
+    </div>
+  </div>
+
   <!-- TEAM MANAGEMENT -->
   <div id="panel-team" class="panel">
     <div class="card" style="max-width:560px;margin-bottom:1rem">
@@ -363,6 +469,9 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <div class="form-row">
         <div class="field"><label>Full name</label><input type="text" id="new-emp-name" placeholder="e.g. Ahmed Hassan"></div>
         <div class="field"><label>Opening balance (days)</label><input type="number" id="new-emp-balance" step="0.5" min="0" value="0"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>Join date (accrual starts in this month)</label><input type="date" id="new-emp-join"></div>
       </div>
       <div class="actions">
         <button class="btn btn-primary" onclick="addEmployee()">Add employee</button>
@@ -374,7 +483,8 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
         <table>
           <thead><tr>
             <th>Employee</th>
-            <th>Opening balance</th>
+            <th>Opening balance (2026)</th>
+            <th>Join date</th>
             <th>Status</th>
             <th>Actions</th>
           </tr></thead>
@@ -627,7 +737,7 @@ function debounceSave(){
 }
 
 function forcSync(){
-  loadFromCloud().then(()=>{refreshAllDropdowns();renderDashboard();renderTeam();renderLog();renderAdj();renderHolidays();});
+  loadFromCloud().then(()=>{refreshAllDropdowns();refreshViews();renderTeam();renderLog();renderAdj();renderHolidays();});
 }
 
 /* ══════════════════════════════════════════════
@@ -695,34 +805,53 @@ function workingDays(fromStr,toStr){
   }
   return n;
 }
-function accrued(){return parseFloat((new Date().getMonth()*ACCRUAL).toFixed(4));}
+const OPENING_YEAR=2026;           // year the manual opening balances belong to
+let viewYear=new Date().getFullYear();
+function yearOf(d){return parseInt(String(d||'').slice(0,4),10);}
+function getSettings(){return Object.assign({carryOverCap:0},S.settings||{});}
+function joinInfo(emp){
+  const jd=(S.joinDates||{})[emp];
+  if(!jd||!/^\d{4}-\d{2}-\d{2}$/.test(jd))return null;
+  return{date:jd,year:yearOf(jd),month:parseInt(jd.slice(5,7),10)-1};
+}
+// Months credited for year y. Closed year = 12, current year = completed months, future = 0.
+// With a join date: accrual starts in the join month (the join month counts as a full month).
+function accruedFor(y,emp,full){
+  const cy=new Date().getFullYear();
+  let months=full?12:(y<cy?12:y===cy?new Date().getMonth():0);
+  const ji=joinInfo(emp);
+  if(ji){
+    if(ji.year>y)months=0;
+    else if(ji.year===y)months=Math.max(0,months-ji.month);
+  }
+  return parseFloat((months*ACCRUAL).toFixed(4));
+}
+function carryOver(emp,y){            // balance carried from year y into y+1
+  const rem=getBalance(emp,y,true).annualRemaining;
+  const cap=Math.max(0,parseFloat(getSettings().carryOverCap)||0);
+  return Math.min(Math.max(rem,0),cap); // rule: balance resets on 1 Jan (cap defaults to 0); overdrawn resets to 0 too
+}
+function openingFor(emp,y){
+  if(y<=OPENING_YEAR) return parseFloat((S.opening||{})[emp]||0);
+  return carryOver(emp,y-1);
+}
 const SICK_ENTITLEMENT = 30;
 
-function getBalance(emp){
-  const op=parseFloat((S.opening||{})[emp]||0);
-  const ac=accrued();
-  const adj=(S.adjustments||[]).filter(a=>a.emp===emp).reduce((s,a)=>s+parseFloat(a.days),0);
-
-  // Annual leave: excludes sick leave entries
-  const takenAnnual=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Annual Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
-  // Hourly leave deducts from annual
-  const takenHrs=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Hourly Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.hours||0),0);
+function getBalance(emp,year,full){
+  year=year||viewYear;
+  const inY=d=>yearOf(d)===year;
+  const op=openingFor(emp,year);
+  const ac=accruedFor(year,emp,full);
+  const adj=(S.adjustments||[]).filter(a=>a.emp===emp&&inY(a.date)).reduce((s,a)=>s+parseFloat(a.days),0);
+  const L=(S.leaves||[]).filter(l=>l.emp===emp&&!l.holiday&&inY(l.from));
+  const takenAnnual=L.filter(l=>l.type==='Annual Leave').reduce((s,l)=>s+parseFloat(l.days||0),0);
+  const takenHrs=L.filter(l=>l.type==='Hourly Leave').reduce((s,l)=>s+parseFloat(l.hours||0),0);
   const takenHrsDays=takenHrs/8;
-
-  // Sick leave: separate 30-day entitlement
-  const takenSick=(S.leaves||[]).filter(l=>l.emp===emp&&l.type==='Sick Leave'&&!l.holiday).reduce((s,l)=>s+parseFloat(l.days||0),0);
+  const takenSick=L.filter(l=>l.type==='Sick Leave').reduce((s,l)=>s+parseFloat(l.days||0),0);
   const sickRemaining=SICK_ENTITLEMENT-takenSick;
-
   const earned=op+ac+adj;
-  const annualTaken=takenAnnual+takenHrsDays;
-  const annualRemaining=earned-annualTaken;
-
-  return{
-    op,ac,adj,earned,
-    takenAnnual,takenHrsDays,takenHrs,
-    annualRemaining,
-    takenSick,sickRemaining
-  };
+  const annualRemaining=earned-(takenAnnual+takenHrsDays);
+  return{op,ac,adj,earned,takenAnnual,takenHrsDays,takenHrs,annualRemaining,takenSick,sickRemaining,year};
 }
 function initials(n){return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function fmtDate(d){
@@ -766,7 +895,8 @@ function renderDashboard(){
     <div class="metric"><div class="lbl">Annual overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
     <div class="metric"><div class="lbl">Annual low (≤4 days)</div><div class="val" style="color:#d97706">${low}</div></div>
     <div class="metric"><div class="lbl">Sick low (≤5 days)</div><div class="val" style="color:#d97706">${sickLow}</div></div>
-    <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
+    <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday&&yearOf(l.from)===viewYear).length}</div></div>`;
+  const dy=document.getElementById('dash-year'); if(dy)dy.textContent='· '+viewYear;
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
   let balRows2=getActiveEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
   if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
@@ -835,7 +965,7 @@ document.addEventListener('click',function(e){
 function renderLog(){
   const fe=document.getElementById('log-filter-emp').value;
   const ft=document.getElementById('log-filter-type').value;
-  let rows=(S.leaves||[]).map((l,oi)=>({...l,_oi:oi}));
+  let rows=(S.leaves||[]).map((l,oi)=>({...l,_oi:oi})).filter(l=>yearOf(l.from)===viewYear);
   if(fe)rows=rows.filter(l=>l.emp===fe);
   if(ft)rows=rows.filter(l=>l.type===ft);
   const keys=['_seq','emp','type','from','to','days','hours','_deducted','_holiday','remarks'];
@@ -865,12 +995,12 @@ function renderLog(){
       </td>
     </tr>`;
   }).join('');
-  document.getElementById('log-count').textContent=`${rows.length} entries`;
+  document.getElementById('log-count').textContent=`${rows.length} entries · ${viewYear}`;
   setThClasses('panel-log',col,dir);
 }
 function renderAdj(){
   const fe=document.getElementById('adj-filter-emp')?document.getElementById('adj-filter-emp').value:'';
-  let rows=(S.adjustments||[]).map((a,oi)=>({...a,_oi:oi,_days:parseFloat(a.days)}));
+  let rows=(S.adjustments||[]).map((a,oi)=>({...a,_oi:oi,_days:parseFloat(a.days)})).filter(a=>yearOf(a.date)===viewYear);
   if(fe)rows=rows.filter(a=>a.emp===fe);
   const keys=['_seq','emp','date','_days','reason'];
   const {col,dir}=sortState.adj;
@@ -922,10 +1052,12 @@ function toggleHourly(){
   document.getElementById('hourly-block').style.display=isH?'block':'none';
   document.getElementById('fullday-block').style.display=isH?'none':'block';
   document.getElementById('days-preview-row').style.display='none';
+  checkOverlap();
 }
 function calcDays(){
   const f=document.getElementById('add-from').value,t=document.getElementById('add-to').value||f;
   if(f&&t){document.getElementById('add-days-val').value=workingDays(f,t)+' working day(s)';document.getElementById('days-preview-row').style.display='grid';}
+  checkOverlap();
 }
 function addLeave(){
   const emp=document.getElementById('add-emp').value;
@@ -934,26 +1066,37 @@ function addLeave(){
   const isHolOvr=document.getElementById('add-holiday-override').checked;
   const remarks=document.getElementById('add-remarks').value.trim();
   if(!S.leaves)S.leaves=[];
+  let warn='';
+  const overdraw=(from,deduct)=>{
+    const ji=joinInfo(emp);
+    const early=(ji&&from<ji.date)?` Note: this date is before ${emp}'s join date (${fmtDate(ji.date)}).`:'';
+    if(isHolOvr)return early;
+    const b=getBalance(emp,yearOf(from));
+    const rem=type==='Sick Leave'?b.sickRemaining:b.annualRemaining;
+    return early+(rem-deduct<0?` Warning: ${emp} has ${rem.toFixed(2)} days of ${type==='Sick Leave'?'sick':'annual'} balance left; this overdraws it.`:'');
+  };
   if(isH){
     const date=document.getElementById('add-hourly-date').value;
     const hours=parseFloat(document.getElementById('add-hours').value);
     if(!date){showAlert('add-alert','Please select a date.');return;}
     if(!hours||hours<0.5||hours>7.5||hours%0.5!==0){showAlert('add-alert','Hours must be 0.5–7.5 in 0.5 steps.');return;}
+    warn=overdraw(date,hours/8);
     S.leaves.push({emp,type,from:date,to:date,days:0,hours,remarks,holiday:isHolOvr});
   } else {
     const from=document.getElementById('add-from').value,to=document.getElementById('add-to').value||from;
     if(!from){showAlert('add-alert','Please select a start date.');return;}
     const days=workingDays(from,to);
-    if(!isHolOvr){const b=getBalance(emp);if(b.remaining-days<0)showAlert('add-alert',`Warning: ${emp} has ${b.remaining.toFixed(2)} days remaining. This will overdraw their balance.`);}
+    warn=overdraw(from,days);
     S.leaves.push({emp,type,from,to,days,hours:0,remarks,holiday:isHolOvr});
   }
   debounceSave();
-  showAlert('add-alert','Entry saved.','success');
+  showAlert('add-alert','Entry saved.'+warn,warn?'warn':'success');
   ['add-from','add-to','add-hourly-date','add-remarks'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('add-hours').value='1';
   document.getElementById('add-holiday-override').checked=false;
   document.getElementById('days-preview-row').style.display='none';
-  renderDashboard();
+  checkOverlap();
+  refreshViews();
 }
 function addAdjustment(){
   const emp=document.getElementById('adj-emp').value;
@@ -968,6 +1111,7 @@ function addAdjustment(){
   if(!isNaN(days)&&days!==0)S.adjustments.push({emp,date,days,reason});
   debounceSave();
   showAlert('adj-alert','Adjustment saved.','success');
+  setTimeout(updateCompChecks,0);
   ['adj-days','adj-date','adj-reason','adj-opening'].forEach(id=>document.getElementById(id).value='');
   renderDashboard();renderAdj();
 }
@@ -976,13 +1120,329 @@ function addHoliday(){
   if(!date||!name){alert('Please fill in both date and name.');return;}
   if(!S.holidays)S.holidays=[];
   if(S.holidays.some(h=>h.date===date)){alert('This date is already a holiday.');return;}
-  S.holidays.push({date,name});debounceSave();
+  S.holidays.push({date,name});debounceSave();refreshCompUI();
   document.getElementById('hol-date').value='';document.getElementById('hol-name').value='';
   renderHolidays();
 }
-function delLeave(i){if(!confirm('Delete this leave entry?'))return;S.leaves.splice(i,1);debounceSave();renderLog();renderDashboard();}
-function delAdj(i){if(!confirm('Delete this adjustment?'))return;S.adjustments.splice(i,1);debounceSave();renderAdj();renderDashboard();}
-function delHol(i){if(!confirm('Remove this holiday?'))return;S.holidays.splice(i,1);debounceSave();renderHolidays();}
+function delLeave(i){if(!confirm('Delete this leave entry?'))return;S.leaves.splice(i,1);debounceSave();refreshViews();}
+function delAdj(i){if(!confirm('Delete this adjustment?'))return;S.adjustments.splice(i,1);debounceSave();refreshViews();updateCompChecks();}
+function delHol(i){if(!confirm('Remove this holiday?'))return;S.holidays.splice(i,1);debounceSave();renderHolidays();refreshCompUI();}
+
+/* ══════════════════════════════════════════════
+   EMPLOYEE REPORT
+══════════════════════════════════════════════ */
+function escH(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function reportData(emp){
+  const b=getBalance(emp);
+  const leaves=(S.leaves||[]).filter(l=>l.emp===emp&&!l.holiday&&yearOf(l.from)===viewYear).sort((a,c)=>a.from.localeCompare(c.from));
+  const adjs=(S.adjustments||[]).filter(a=>a.emp===emp&&yearOf(a.date)===viewYear).sort((a,c)=>a.date.localeCompare(c.date));
+  const mm={};
+  const get=k=>mm[k]||(mm[k]={annual:0,hours:0,sick:0,comp:0,neg:0});
+  leaves.forEach(l=>{const r=get(l.from.slice(0,7));
+    if(l.type==='Annual Leave')r.annual+=parseFloat(l.days||0);
+    else if(l.type==='Hourly Leave')r.hours+=parseFloat(l.hours||0);
+    else if(l.type==='Sick Leave')r.sick+=parseFloat(l.days||0);});
+  adjs.forEach(a=>{const r=get(a.date.slice(0,7));const d=parseFloat(a.days);if(d>=0)r.comp+=d;else r.neg+=d;});
+  const months=Object.keys(mm).sort().map(k=>({key:k,label:MONTHS[parseInt(k.slice(5))-1]+' '+k.slice(0,4),...mm[k]}));
+  return{b,leaves,adjs,months};
+}
+
+function renderReport(){
+  const sel=document.getElementById('rep-emp'); if(!sel)return;
+  const emp=sel.value; const body=document.getElementById('rep-body');
+  if(!emp){body.innerHTML='';return;}
+  const {b,leaves,adjs,months}=reportData(emp);
+  const inactive=isInactive(emp);
+  const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const hrsDays=b.takenHrsDays;
+  const kv=(k,v)=>`<tr><td>${k}</td><td>${v}</td></tr>`;
+  const f2=n=>n.toFixed(2);
+  const lt=leaves.map(l=>`<tr><td>${fmtDate(l.from)}</td><td>${fmtDate(l.to||l.from)}</td><td>${typeBadge(l.type)}</td><td>${l.type==='Hourly Leave'?'':l.days}</td><td>${l.hours>0?l.hours+' h':''}</td><td>${l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days}</td><td>${escH(l.remarks)}</td></tr>`).join('')||'<tr><td colspan="7" style="color:#999">No leave recorded</td></tr>';
+  const at=adjs.map(a=>`<tr><td>${fmtDate(a.date)}</td><td style="font-weight:600;color:${a.days<0?'#dc2626':'#16a34a'}">${a.days>0?'+':''}${a.days}</td><td>${escH(a.reason)}</td></tr>`).join('')||'<tr><td colspan="3" style="color:#999">No adjustments</td></tr>';
+  const mt=months.map(m=>`<tr><td>${m.label}</td><td>${m.annual||''}</td><td>${m.hours?m.hours+' h':''}</td><td>${m.sick||''}</td><td>${m.comp?'+'+m.comp:''}</td><td>${m.neg||''}</td></tr>`).join('')||'<tr><td colspan="6" style="color:#999">No activity</td></tr>';
+  body.innerHTML=`
+    <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="emp-avatar" style="width:44px;height:44px;font-size:15px">${escH(initials(emp))}</div>
+      <div style="flex:1;min-width:180px"><div style="font-size:18px;font-weight:700;color:#1b2a4a">${escH(emp)}</div>
+      <div style="font-size:12px;color:#888">Leave report ${viewYear} &middot; ${today} &middot; ${inactive?'Inactive':'Active'}${(S.joinDates||{})[emp]?' &middot; Joined '+fmtDate(S.joinDates[emp]):''}</div></div>
+      <div style="font-size:12px;color:#888">AAFETS IT Operations</div>
+    </div>
+    <div class="rep-grid">
+      <div class="metric"><div class="lbl">Annual remaining</div><div class="val">${f2(b.annualRemaining)}</div></div>
+      <div class="metric"><div class="lbl">Annual earned</div><div class="val">${f2(b.earned)}</div></div>
+      <div class="metric"><div class="lbl">Annual taken (incl. hourly)</div><div class="val">${f2(b.takenAnnual+hrsDays)}</div></div>
+      <div class="metric"><div class="lbl">Sick remaining</div><div class="val">${f2(b.sickRemaining)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem">
+      <div class="card"><div class="card-title">Annual balance breakdown</div><table class="rep-kv"><tbody>
+        ${kv(viewYear>OPENING_YEAR?'Carried over from '+(viewYear-1):'Opening balance',f2(b.op))}${kv((viewYear<new Date().getFullYear()?'Accrued (full year, 1.75 / month)':'Accrued to date (1.75 / month)'),f2(b.ac))}${kv('Adjustments (net)',(b.adj>=0?'+':'')+f2(b.adj))}
+        ${kv('<b>Total earned</b>',f2(b.earned))}${kv('Annual leave taken',f2(b.takenAnnual))}${kv('Hourly leave taken ('+b.takenHrs+' h)',f2(hrsDays))}
+        ${kv('<b>Annual remaining</b>',f2(b.annualRemaining))}</tbody></table></div>
+      <div class="card"><div class="card-title">Sick leave (${SICK_ENTITLEMENT} days / year)</div><table class="rep-kv"><tbody>
+        ${kv('Entitlement',SICK_ENTITLEMENT)}${kv('Taken',f2(b.takenSick))}${kv('<b>Remaining</b>',f2(b.sickRemaining))}
+        ${kv('Annual status',statusBadge(b.annualRemaining))}${kv('Sick status',sickStatusBadge(b.sickRemaining))}</tbody></table></div>
+    </div>
+    <div class="card"><div class="card-title">Monthly summary</div><div class="tbl-wrap"><table><thead><tr><th>Month</th><th>Annual (days)</th><th>Hourly</th><th>Sick (days)</th><th>Comp days earned</th><th>Deductions</th></tr></thead><tbody>${mt}</tbody></table></div>
+      <div style="font-size:11px;color:#999;margin-top:6px">Multi-day leave is counted in the month it starts.</div></div>
+    <div class="card"><div class="card-title">Leave history (${leaves.length})</div><div class="tbl-wrap"><table><thead><tr><th>From</th><th>To</th><th>Type</th><th>Days</th><th>Hours</th><th>Deducted (days)</th><th>Remarks</th></tr></thead><tbody>${lt}</tbody></table></div></div>
+    <div class="card"><div class="card-title">Adjustments (${adjs.length})</div><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Days</th><th>Reason</th></tr></thead><tbody>${at}</tbody></table></div></div>`;
+}
+
+function refreshReportDropdown(){
+  const el=document.getElementById('rep-emp'); if(!el)return;
+  const cur=el.value;
+  el.innerHTML=getEmployees().map(e=>`<option value="${escH(e)}">${escH(e)}${isInactive(e)?' (inactive)':''}</option>`).join('');
+  if(cur&&getEmployees().includes(cur))el.value=cur;
+}
+
+function exportEmployeeReport(){
+  const emp=document.getElementById('rep-emp').value; if(!emp)return;
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load (check internet connection) — refresh and try again.');return;}
+  const {b,leaves,adjs,months}=reportData(emp);
+  const wb=XLSX.utils.book_new();
+  const add=(name,rows,widths)=>{const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,name);};
+  add('Summary',[['Employee',emp],['Year',viewYear],['Status',isInactive(emp)?'Inactive':'Active'],['Report date',new Date().toISOString().slice(0,10)],[],
+    ['Opening balance',+b.op.toFixed(3)],['Accrued to date',+b.ac.toFixed(3)],['Adjustments (net)',+b.adj.toFixed(3)],['Total earned',+b.earned.toFixed(3)],
+    ['Annual leave taken (days)',+b.takenAnnual.toFixed(3)],['Hourly leave taken (hours)',b.takenHrs],['Hourly leave taken (days)',+b.takenHrsDays.toFixed(3)],['Annual remaining',+b.annualRemaining.toFixed(3)],[],
+    ['Sick entitlement',SICK_ENTITLEMENT],['Sick taken',+b.takenSick.toFixed(3)],['Sick remaining',+b.sickRemaining.toFixed(3)]],[30,20]);
+  add('Monthly',[['Month','Annual days','Hourly hours','Sick days','Comp days earned','Deductions'],...months.map(m=>[m.label,m.annual,m.hours,m.sick,m.comp,m.neg])],[14,12,13,10,17,12]);
+  add('Leave',[['From','To','Type','Days','Hours','Deducted (days)','Remarks'],...leaves.map(l=>[fmtDate(l.from),fmtDate(l.to||l.from),l.type,l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours:'',l.type==='Hourly Leave'?+(l.hours/8).toFixed(3):l.days,l.remarks||''])],[13,13,14,7,7,15,45]);
+  add('Adjustments',[['Date','Days','Reason'],...adjs.map(a=>[fmtDate(a.date),a.days,a.reason||''])],[13,8,50]);
+  XLSX.writeFile(wb,'AAFETS_Report_'+emp.replace(/[^\w]+/g,'_')+'_'+viewYear+'.xlsx');
+}
+
+
+/* ══════════════════════════════════════════════
+   YEAR + VIEW REFRESH
+══════════════════════════════════════════════ */
+function refreshYearSelect(){
+  const el=document.getElementById('year-sel'); if(!el)return;
+  const cy=new Date().getFullYear(); let max=cy;
+  (S.leaves||[]).forEach(l=>{const y=yearOf(l.from); if(y>max&&y<=cy+1)max=y;});
+  (S.adjustments||[]).forEach(a=>{const y=yearOf(a.date); if(y>max&&y<=cy+1)max=y;});
+  const ys=[]; for(let y=OPENING_YEAR;y<=max;y++)ys.push(y);
+  if(!ys.includes(viewYear))viewYear=ys.includes(cy)?cy:ys[ys.length-1];
+  el.innerHTML=ys.map(y=>`<option value="${y}"${y===viewYear?' selected':''}>${y}</option>`).join('');
+}
+function setYear(v){viewYear=parseInt(v,10);refreshViews();}
+function refreshViews(){
+  renderDashboard();renderLog();renderAdj();renderReport();renderCalendar();renderSettings();
+}
+
+/* ══════════════════════════════════════════════
+   OVERLAP WARNING
+══════════════════════════════════════════════ */
+function shortName(n){const p=String(n).trim().split(/\s+/);return p.length>1?p[0]+' '+p[p.length-1][0]+'.':p[0];}
+function rangeOverlapDays(a1,a2,b1,b2){const st=a1>b1?a1:b1,en=a2<b2?a2:b2;return st>en?0:workingDays(st,en);}
+function findOverlaps(emp,from,to,skipIdx){
+  const others=[],same=[];
+  (S.leaves||[]).forEach((l,i)=>{
+    if(i===skipIdx||l.holiday)return;
+    if(!rangeOverlapDays(from,to,l.from,l.to||l.from))return;
+    (l.emp===emp?same:others).push(l);
+  });
+  return{others,same};
+}
+function fmtLeaveBrief(l){
+  const t=l.type==='Hourly Leave'?`hourly ${l.hours}h`:l.type.replace(' Leave','').toLowerCase();
+  const r=(l.to&&l.to!==l.from)?`${fmtDate(l.from)} → ${fmtDate(l.to)}`:fmtDate(l.from);
+  return `${escH(shortName(l.emp))} (${t}, ${r})`;
+}
+function checkOverlap(){
+  const box=document.getElementById('add-overlap'); if(!box)return;
+  const emp=document.getElementById('add-emp').value;
+  const isH=document.getElementById('add-type').value==='Hourly Leave';
+  const from=isH?document.getElementById('add-hourly-date').value:document.getElementById('add-from').value;
+  const to=isH?from:(document.getElementById('add-to').value||from);
+  if(!emp||!from||!to||to<from){box.innerHTML='';return;}
+  const {others,same}=findOverlaps(emp,from,to,-1);
+  let h='';
+  const list=a=>a.slice(0,6).map(fmtLeaveBrief).join('; ')+(a.length>6?` and ${a.length-6} more`:'');
+  if(same.length)h+=`<div class="alert" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;margin-bottom:8px">${escH(emp)} already has leave on these dates: ${list(same)}. Check this isn't a duplicate.</div>`;
+  if(others.length)h+=`<div class="alert alert-warn" style="margin-bottom:8px">${others.length} other${others.length>1?'s are':' is'} also off: ${list(others)}.</div>`;
+  box.innerHTML=h;
+}
+
+/* ══════════════════════════════════════════════
+   TEAM CALENDAR
+══════════════════════════════════════════════ */
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+function calNav(d){
+  if(d===0){calYear=new Date().getFullYear();calMonth=new Date().getMonth();}
+  else{calMonth+=d;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}}
+  renderCalendar();
+}
+function renderCalendar(){
+  const grid=document.getElementById('cal-grid'); if(!grid)return;
+  const pad=n=>String(n).padStart(2,'0');
+  const first=new Date(calYear,calMonth,1,12), nDays=new Date(calYear,calMonth+1,0).getDate();
+  const todayD=new Date(), todayStr=`${todayD.getFullYear()}-${pad(todayD.getMonth()+1)}-${pad(todayD.getDate())}`;
+  const names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const COL={'Annual Leave':'background:#dbeafe;color:#1e40af','Sick Leave':'background:#fef3c7;color:#92400e','Hourly Leave':'background:#ede9fe;color:#5b21b6'};
+  let h='<div class="cal">'+names.map((n,i)=>`<div class="cal-h"${i>=5?' style="color:#aaa"':''}>${n}</div>`).join('');
+  for(let i=0;i<first.getDay();i++)h+='<div class="cal-d blank"></div>';
+  const busy=[];
+  for(let d=1;d<=nDays;d++){
+    const ds=`${calYear}-${pad(calMonth+1)}-${pad(d)}`;
+    const we=isWeekend(ds), hol=(S.holidays||[]).find(x=>x.date===ds);
+    const here=[];
+    (S.leaves||[]).forEach((l,i)=>{
+      if(l.holiday)return;
+      if(ds<l.from||ds>(l.to||l.from))return;
+      if(l.type!=='Hourly Leave'&&(we||hol))return;
+      here.push({l,i});
+    });
+    const full=here.filter(x=>x.l.type!=='Hourly Leave').length;
+    if(full>=2)busy.push(`${d} (${full})`);
+    const cls='cal-d'+(we?' we':'')+(hol?' hol':'')+(full>=3?' hi':full===2?' mid':'')+(ds===todayStr?' today':'');
+    here.sort((a,b)=>(a.l.type==='Hourly Leave')-(b.l.type==='Hourly Leave'));
+    h+=`<div class="${cls}"><div class="cal-n"><span>${d}</span>${full?`<span style="font-weight:400;color:#888">${full} off</span>`:''}</div>`+
+      (hol?`<div class="cal-hn">${escH(hol.name)}</div>`:'')+
+      here.map(x=>`<span class="cal-chip" style="${COL[x.l.type]||''}${isInactive(x.l.emp)?';opacity:.6':''}" title="${escH(x.l.emp)} — ${escH(x.l.type)}${x.l.remarks?': '+escH(x.l.remarks):''}" onclick="openEditModal(${x.i})">${escH(shortName(x.l.emp))}${x.l.type==='Hourly Leave'?' '+x.l.hours+'h':''}</span>`).join('')+'</div>';
+  }
+  grid.innerHTML=h+'</div>';
+  document.getElementById('cal-title').textContent=MONTHS[calMonth]+' '+calYear;
+  document.getElementById('cal-summary').textContent=busy.length?`Days with 2+ people off: ${busy.join(', ')}`:'No days with 2+ people off this month.';
+}
+
+/* ══════════════════════════════════════════════
+   COMP DAYS SHORTCUT
+══════════════════════════════════════════════ */
+function refreshCompUI(){
+  const sel=document.getElementById('comp-hol'); if(!sel)return;
+  const cur=sel.value;
+  const hols=[...(S.holidays||[])].sort((a,b)=>b.date.localeCompare(a.date));
+  sel.innerHTML='<option value="">— choose a holiday (or enter a date below) —</option>'+hols.map(h=>`<option value="${escH(h.date)}">${fmtDate(h.date)} — ${escH(h.name)}</option>`).join('');
+  if(cur&&hols.some(h=>h.date===cur))sel.value=cur;
+  const box=document.getElementById('comp-emps');
+  const checked=new Set([...box.querySelectorAll('input:checked')].map(x=>x.value));
+  box.innerHTML=getActiveEmployees().map(e=>`<label style="font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" value="${escH(e)}"${checked.has(e)?' checked':''}> <span>${escH(e)}</span></label>`).join('');
+  updateCompChecks();
+}
+function compSelect(){
+  const d=document.getElementById('comp-hol').value;
+  const h=(S.holidays||[]).find(x=>x.date===d);
+  document.getElementById('comp-date').value=d||'';
+  document.getElementById('comp-name').value=h?h.name:'';
+  updateCompChecks();
+}
+function compHas(emp,date){return (S.adjustments||[]).some(a=>a.emp===emp&&a.date===date&&parseFloat(a.days)>0);}
+function updateCompChecks(){
+  const date=document.getElementById('comp-date')?document.getElementById('comp-date').value:'';
+  document.querySelectorAll('#comp-emps label').forEach(lb=>{
+    const cb=lb.querySelector('input'), sp=lb.querySelector('span');
+    const done=!!date&&compHas(cb.value,date);
+    cb.disabled=done; if(done)cb.checked=false;
+    sp.textContent=cb.value+(done?' ✓ already credited':'');
+    lb.style.opacity=done?.55:1;
+  });
+}
+function compAll(v){document.querySelectorAll('#comp-emps input:not(:disabled)').forEach(cb=>cb.checked=v);}
+function applyComp(){
+  const date=document.getElementById('comp-date').value;
+  const name=document.getElementById('comp-name').value.trim();
+  const days=parseFloat(document.getElementById('comp-days').value);
+  const emps=[...document.querySelectorAll('#comp-emps input:checked')].map(x=>x.value);
+  if(!date){showAlert('comp-alert','Choose a holiday or enter a date.');return;}
+  if(!name){showAlert('comp-alert','Enter the holiday name (used as the reason).');return;}
+  if(!(days>0)){showAlert('comp-alert','Days must be greater than 0.');return;}
+  if(!emps.length){showAlert('comp-alert','Tick at least one employee.');return;}
+  if(!S.adjustments)S.adjustments=[];
+  const skipped=[];let n=0;
+  emps.forEach(e=>{
+    if(compHas(e,date)){skipped.push(e);return;}
+    S.adjustments.push({emp:e,date,days,reason:'Worked on '+name});n++;
+  });
+  debounceSave();
+  showAlert('comp-alert',`Credited ${days} day${days===1?'':'s'} to ${n} employee${n===1?'':'s'}.`+(skipped.length?` Skipped (already credited): ${skipped.join(', ')}.`:''),'success');
+  refreshViews();updateCompChecks();
+}
+
+/* ══════════════════════════════════════════════
+   SETTINGS + CARRY-OVER PREVIEW
+══════════════════════════════════════════════ */
+function renderSettings(){
+  const cap=document.getElementById('set-cap'); if(!cap)return;
+  if(document.activeElement!==cap)cap.value=getSettings().carryOverCap;
+  const c=Math.max(0,parseFloat(getSettings().carryOverCap)||0);
+  const cy=new Date().getFullYear();
+  document.getElementById('set-prev-title').textContent=`Carry-over preview: ${viewYear} → ${viewYear+1}`;
+  document.getElementById('set-prev-note').textContent=viewYear<cy
+    ?`${viewYear} is closed: year-end balance is final (full 12 months accrued).`
+    :`Projection: assumes the full ${12*ACCRUAL} days are accrued by 31 Dec and no further leave is taken. Sick leave is not carried over.`;
+  document.getElementById('set-prev-body').innerHTML=getActiveEmployees().map(e=>{
+    const rem=getBalance(e,viewYear,true).annualRemaining;
+    const carry=Math.min(Math.max(rem,0),c), lost=rem>c?rem-c:0;
+    return `<tr><td>${escH(e)}</td><td>${rem.toFixed(2)}</td><td style="font-weight:600">${carry.toFixed(2)}</td><td style="color:${lost>0?'#d97706':'#999'}">${lost>0?lost.toFixed(2):'—'}</td></tr>`;
+  }).join('');
+}
+function saveSettings(){
+  const v=parseFloat(document.getElementById('set-cap').value);
+  if(isNaN(v)||v<0){showAlert('set-alert','Enter a number of days (0 or more).');return;}
+  S.settings=Object.assign({},S.settings||{},{carryOverCap:v});
+  debounceSave();
+  showAlert('set-alert','Saved. Balances for later years now use this cap.','success');
+  refreshViews();
+}
+
+/* ══════════════════════════════════════════════
+   BACKUP & RESTORE
+══════════════════════════════════════════════ */
+let pendingRestore=null;
+function downloadBackup(tag){
+  const out=Object.assign({},S,{_meta:{app:'AAFETS Leave',exportedAt:new Date().toISOString(),version:1}});
+  const blob=new Blob([JSON.stringify(out,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='AAFETS_backup_'+new Date().toISOString().slice(0,10)+(typeof tag==='string'&&tag?'_'+tag:'')+'.json';
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function validateBackup(d){
+  const errs=[];
+  if(!d||typeof d!=='object'||Array.isArray(d))return['Not a valid backup file.'];
+  ['leaves','adjustments','holidays','employees'].forEach(k=>{if(!Array.isArray(d[k]))errs.push(`Missing list: ${k}`);});
+  if(errs.length)return errs;
+  if(!d.employees.length)errs.push('Employee list is empty.');
+  const re=/^\d{4}-\d{2}-\d{2}$/;
+  d.leaves.forEach((l,i)=>{if(!l||typeof l.emp!=='string'||!['Annual Leave','Sick Leave','Hourly Leave'].includes(l.type)||!re.test(l.from||''))errs.push(`Leave #${i+1} is malformed`);});
+  d.adjustments.forEach((a,i)=>{if(!a||typeof a.emp!=='string'||!re.test(a.date||'')||!isFinite(parseFloat(a.days)))errs.push(`Adjustment #${i+1} is malformed`);});
+  d.holidays.forEach((h,i)=>{if(!h||!re.test(h.date||''))errs.push(`Holiday #${i+1} is malformed`);});
+  return errs;
+}
+function onRestoreFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; const box=document.getElementById('restore-preview');
+  pendingRestore=null; box.innerHTML='';
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    let d; try{d=JSON.parse(rd.result);}catch(e){box.innerHTML='<div class="alert" style="background:#fee2e2;color:#991b1b">That file is not valid JSON.</div>';return;}
+    const errs=validateBackup(d);
+    if(errs.length){box.innerHTML='<div class="alert" style="background:#fee2e2;color:#991b1b">Cannot restore: '+escH(errs.slice(0,5).join('; '))+(errs.length>5?` (+${errs.length-5} more)`:'')+'</div>';return;}
+    pendingRestore=d;
+    const newest=a=>a.map(l=>l.from).sort().pop()||'—';
+    const row=(k,a,b)=>`<tr><td>${k}</td><td>${a}</td><td style="font-weight:600">${b}</td></tr>`;
+    box.innerHTML=`<table><thead><tr><th></th><th>Current (cloud)</th><th>Backup file</th></tr></thead><tbody>
+      ${row('Leave entries',(S.leaves||[]).length,d.leaves.length)}${row('Adjustments',(S.adjustments||[]).length,d.adjustments.length)}
+      ${row('Holidays',(S.holidays||[]).length,d.holidays.length)}${row('Employees',getEmployees().length,d.employees.length)}
+      ${row('Newest leave',fmtDate(newest(S.leaves||[])),fmtDate(newest(d.leaves)))}${row('Exported',' ',d._meta&&d._meta.exportedAt?d._meta.exportedAt.slice(0,16).replace('T',' '):'unknown')}</tbody></table>
+      <div class="actions" style="margin-top:10px"><button class="btn btn-danger" onclick="confirmRestore()">Replace cloud data with this backup</button></div>`;
+  };
+  rd.readAsText(f);
+}
+async function confirmRestore(){
+  if(!pendingRestore)return;
+  if(!cloudOk){showAlert('backup-alert','Cannot restore: the cloud database is not connected. Press Sync, confirm it says Synced, then try again.');return;}
+  if(!confirm('This REPLACES all current data in the cloud with the backup file.\n\nA safety copy of the current data will be downloaded first. Continue?'))return;
+  downloadBackup('before_restore');
+  const d=JSON.parse(JSON.stringify(pendingRestore)); delete d._meta;
+  S=d; pendingRestore=null;
+  document.getElementById('restore-preview').innerHTML=''; document.getElementById('restore-file').value='';
+  await saveToCloud();
+  refreshAllDropdowns();refreshViews();renderTeam();
+  showAlert('backup-alert','Backup restored and saved to the cloud.','success');
+}
 
 /* ══════════════════════════════════════════════
    EXCEL EXPORT
@@ -993,9 +1453,9 @@ function exportToExcel(){
     {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Annual Earned','Annual Taken','Annual Remaining','Hourly Taken','Sick Entitlement','Sick Taken','Sick Remaining','Annual Status','Sick Status'],
      rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp+(isInactive(emp)?' (Inactive)':''),b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=ANNUAL_RED?'Critical':b.annualRemaining<=ANNUAL_AMBER?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
     {name:'Leave Log',headers:['#','Employee','Type','From','To','Days','Hours','Deducted','Holiday?','Remarks'],
-     rows:[...(S.leaves||[])].sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
+     rows:[...(S.leaves||[])].filter(l=>yearOf(l.from)===viewYear).sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
     {name:'Adjustments',headers:['#','Employee','Date','Days','Reason'],
-     rows:[...(S.adjustments||[])].sort((a,b)=>b.date.localeCompare(a.date)).map((a,i)=>[i+1,a.emp,fmtDate(a.date),(parseFloat(a.days)>=0?'+':'')+parseFloat(a.days).toFixed(2),a.reason||''])},
+     rows:[...(S.adjustments||[])].filter(a=>yearOf(a.date)===viewYear).sort((a,b)=>b.date.localeCompare(a.date)).map((a,i)=>[i+1,a.emp,fmtDate(a.date),(parseFloat(a.days)>=0?'+':'')+parseFloat(a.days).toFixed(2),a.reason||''])},
     {name:'Holidays',headers:['Date','Holiday Name'],
      rows:[...(S.holidays||[])].sort((a,b)=>a.date.localeCompare(b.date)).map(h=>[fmtDate(h.date),h.name])},
   ];
@@ -1011,7 +1471,7 @@ function exportToExcel(){
     ws['!cols']=sh.headers.map((h,ci)=>({wch:Math.min(40,Math.max(String(h).length,...rows.map(r=>String(r[ci]??'').length))+2)}));
     XLSX.utils.book_append_sheet(wb,ws,sh.name);
   });
-  XLSX.writeFile(wb,'AAFETS_Leave_Export_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'AAFETS_Leave_Export_'+viewYear+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ══════════════════════════════════════════════
@@ -1021,12 +1481,16 @@ function showPanel(id){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
-  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays',team:'Team'};
+  const map={dashboard:'Dashboard',log:'Leave Log',add:'+ Add Leave',adjustments:'Adjustments',holidays:'Holidays',team:'Team',report:'Employee Report',calendar:'Calendar',settings:'Settings'};
   document.querySelectorAll('.nav button').forEach(b=>{if(b.textContent.trim()===map[id])b.classList.add('active');});
   if(id==='log')renderLog();
   if(id==='adjustments')renderAdj();
   if(id==='holidays')renderHolidays();
   if(id==='team')renderTeam();
+  if(id==='report'){refreshReportDropdown();renderReport();}
+  if(id==='calendar')renderCalendar();
+  if(id==='settings')renderSettings();
+  if(id==='adjustments')refreshCompUI();
 }
 
 
@@ -1098,8 +1562,7 @@ function saveEdit(){
 
   debounceSave();
   closeEditModal();
-  renderLog();
-  renderDashboard();
+  refreshViews();
 }
 
 // Close modal on overlay click
@@ -1144,6 +1607,7 @@ function renderTeam(){
     return `<tr id="team-row-${i}">
       <td style="font-weight:500;${isInactive(emp)?'color:#9ca3af':''}">${emp}</td>
       <td>${op.toFixed(2)} days</td>
+      <td style="white-space:nowrap">${(S.joinDates||{})[emp]?fmtDate(S.joinDates[emp]):'<span style="color:#aaa">not set</span>'}</td>
       <td>${isInactive(emp)?'<span style="background:#f3f4f6;color:#6b7280;border-radius:10px;padding:2px 9px;font-size:11px">Inactive</span>':'<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:2px 9px;font-size:11px">Active</span>'}</td>
       <td style="white-space:nowrap;display:flex;gap:4px">
         <button class="btn" style="padding:3px 9px;font-size:11px;color:#1e40af;border-color:#93c5fd" onclick="startEditEmployee(${i})">Edit</button>
@@ -1160,7 +1624,8 @@ function startEditEmployee(i){
   const op = parseFloat((S.opening||{})[emp]||0);
   document.getElementById('team-row-'+i).innerHTML = `
     <td><input class="edit-name-input" id="edit-emp-name-${i}" value="${emp}"></td>
-    <td><input class="edit-name-input" id="edit-emp-bal-${i}" type="number" step="0.5" min="0" value="${op}" style="width:100px"></td>
+    <td><input class="edit-name-input" id="edit-emp-bal-${i}" type="number" step="0.5" value="${op}" style="width:100px"></td>
+    <td><input class="edit-name-input" id="edit-emp-join-${i}" type="date" value="${(S.joinDates||{})[emp]||''}" style="width:150px"></td>
     <td>${isInactive(emp)?'Inactive':'Active'}</td>
     <td style="white-space:nowrap;display:flex;gap:4px">
       <button class="btn btn-primary" style="padding:3px 9px;font-size:11px" onclick="saveEditEmployee(${i},'${emp}')">Save</button>
@@ -1184,6 +1649,12 @@ function saveEditEmployee(i, oldName){
   S.opening[newName] = newBal;
   if(newName !== oldName) delete S.opening[oldName];
 
+  // Update join date (and carry it across a rename)
+  if(!S.joinDates) S.joinDates={};
+  const newJoin = document.getElementById('edit-emp-join-'+i).value;
+  if(newName !== oldName) delete S.joinDates[oldName];
+  if(newJoin) S.joinDates[newName]=newJoin; else delete S.joinDates[newName];
+
   // Update name in leaves
   (S.leaves||[]).forEach(l=>{ if(l.emp===oldName) l.emp=newName; });
   // Update name in adjustments
@@ -1195,7 +1666,8 @@ function saveEditEmployee(i, oldName){
   renderDashboard();
   showAlert('team-add-alert', newName !== oldName
     ? `Employee renamed from "${oldName}" to "${newName}" and all records updated.`
-    : `Opening balance updated for ${newName}.`, 'success');
+    : `Details updated for ${newName}.`, 'success');
+  refreshViews();
 }
 
 function addEmployee(){
@@ -1209,6 +1681,8 @@ function addEmployee(){
   S.employees.push(name);
   if(!S.opening) S.opening={};
   S.opening[name] = bal;
+  const join = document.getElementById('new-emp-join').value;
+  if(join){ if(!S.joinDates) S.joinDates={}; S.joinDates[name]=join; }
 
   debounceSave();
   refreshAllDropdowns();
@@ -1216,6 +1690,7 @@ function addEmployee(){
   renderDashboard();
   document.getElementById('new-emp-name').value='';
   document.getElementById('new-emp-balance').value='0';
+  document.getElementById('new-emp-join').value='';
   showAlert('team-add-alert', `${name} added successfully.`, 'success');
 }
 
@@ -1246,6 +1721,9 @@ function refreshAllDropdowns(){
     const el=document.getElementById(id);
     if(el) el.innerHTML=activeOptions;
   });
+  refreshReportDropdown();
+  refreshYearSelect();
+  refreshCompUI();
   const ee=document.getElementById('edit-emp');
   if(ee) ee.innerHTML=empOptions;
   ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
