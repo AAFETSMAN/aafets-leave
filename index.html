@@ -113,19 +113,6 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 .edit-name-input{width:100%;padding:5px 8px;border:1px solid #93c5fd;border-radius:6px;font-size:13px;font-family:inherit}
 .edit-name-input:focus{outline:none;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
 
-.print-only{display:none}
-@media print{
-  body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .topbar,.nav,.filter-row,#pin-screen,.modal-overlay,#sync-badge{display:none!important}
-  .panel{display:none!important}
-  #panel-report{display:block!important}
-  #panel-report .card{border:none!important;box-shadow:none!important;padding:0!important}
-  #panel-report .page-header{display:none!important}
-  .print-only{display:block!important}
-  .tbl-wrap{overflow:visible!important}
-  tr{page-break-inside:avoid}
-  thead{display:table-header-group}
-}
 </style>
 </head>
 <body>
@@ -156,6 +143,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
       <button class="pin-key" onclick="pinBack()" style="font-size:13px;color:#888">&#9003;</button>
     </div>
     <div class="pin-err" id="pin-err"></div>
+    <div class="pin-hint">Default PIN: 1234</div>
   </div>
 </div>
 
@@ -185,7 +173,6 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     <button onclick="showPanel('adjustments')">Adjustments</button>
     <button onclick="showPanel('holidays')">Holidays</button>
     <button onclick="showPanel('team')">Team</button>
-    <button onclick="showPanel('report')">Employee Report</button>
   </div>
 
   <!-- DASHBOARD -->
@@ -388,6 +375,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
           <thead><tr>
             <th>Employee</th>
             <th>Opening balance</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr></thead>
           <tbody id="team-tbody"></tbody>
@@ -396,43 +384,6 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
     </div>
   </div>
 
-
-  <!-- EMPLOYEE REPORT (read-only, per-employee) -->
-  <div id="panel-report" class="panel">
-    <div class="card">
-      <div class="page-header">
-        <div class="card-title" style="margin:0">Employee leave report</div>
-        <div class="filter-row">
-          <select id="report-emp" onchange="renderReport()" style="width:200px"></select>
-          <button class="btn" style="padding:5px 12px;font-size:12px" onclick="printReport()">&#128438; Print</button>
-        </div>
-      </div>
-      <div id="report-empty" class="muted">Select an employee to view their report.</div>
-      <div id="report-body" style="display:none">
-        <div class="print-only" style="margin-bottom:14px">
-          <div style="font-size:18px;font-weight:600">AAFETS — Employee Leave Report</div>
-          <div id="report-print-sub" style="font-size:13px;color:#555;margin-top:2px"></div>
-        </div>
-        <div class="grid4" id="report-metrics"></div>
-        <div class="card-title" style="margin-top:8px">Leave history</div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th>Type</th><th>From</th><th>To</th><th>Days</th><th>Hours</th><th>Deducted</th><th>Holiday?</th><th>Remarks</th>
-            </tr></thead>
-            <tbody id="report-log-tbody"></tbody>
-          </table>
-        </div>
-        <div class="card-title" style="margin-top:14px">Adjustment history</div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>Date</th><th>Days</th><th>Reason</th></tr></thead>
-            <tbody id="report-adj-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 
 <!-- EDIT LEAVE MODAL -->
 <div class="modal-overlay hidden" id="edit-modal">
@@ -489,6 +440,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
    No tokens, no secrets, nothing sensitive.
 ══════════════════════════════════════════════ */
 const WORKER_URL = 'https://aafets-sync.atheer-mohammed.workers.dev';
+const PIN_CODE   = '5287';
 
 /* ══════════════════════════════════════════════
    DEFAULT DATA (used only on very first load)
@@ -595,8 +547,7 @@ function setSyncBadge(state,msg){
 async function loadFromCloud(){
   showLoading('Loading data...');
   try{
-    const res=await fetch(WORKER_URL+'/data',{method:'GET',headers:authHeader()});
-    if(res.status===401){handleSessionExpired();return;}
+    const res=await fetch(WORKER_URL,{method:'GET'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
     if(data.leaves&&data.leaves.length>0){
@@ -620,12 +571,11 @@ async function saveToCloud(){
   setSyncBadge('saving','Saving...');
   try{localStorage.setItem('aafets_cache',JSON.stringify(S));}catch(e){}
   try{
-    const res=await fetch(WORKER_URL+'/data',{
+    const res=await fetch(WORKER_URL,{
       method:'PUT',
-      headers:{...authHeader(),'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify(S)
     });
-    if(res.status===401){handleSessionExpired();return;}
     if(!res.ok) throw new Error('HTTP '+res.status);
     setSyncBadge('ok','Synced ✓');
     setTimeout(()=>setSyncBadge('ok','Synced'),2000);
@@ -654,77 +604,35 @@ function showLoading(msg){
 function hideLoading(){document.getElementById('loading').classList.add('hidden');}
 
 /* ══════════════════════════════════════════════
-   SESSION TOKEN
-══════════════════════════════════════════════ */
-function authHeader(){
-  const t=localStorage.getItem('aafets_token');
-  return t?{'Authorization':'Bearer '+t}:{};
-}
-function tokenValid(){
-  const t=localStorage.getItem('aafets_token');
-  const exp=parseInt(localStorage.getItem('aafets_token_exp')||'0',10);
-  return !!t && exp>Math.floor(Date.now()/1000);
-}
-function handleSessionExpired(){
-  localStorage.removeItem('aafets_token');
-  localStorage.removeItem('aafets_token_exp');
-  pinUnlocked=false;
-  document.getElementById('pin-screen').classList.remove('hidden');
-  document.getElementById('pin-err').textContent='Session expired. Please re-enter your PIN.';
-  setSyncBadge('err','Signed out');
-}
-
-/* ══════════════════════════════════════════════
    PIN
 ══════════════════════════════════════════════ */
 let pinEntry='';
 let pinUnlocked=false;
-let pinBusy=false;
 
 function pinKey(k){
-  if(pinBusy||pinEntry.length>=4)return;
+  if(pinEntry.length>=4)return;
   pinEntry+=k;updateDots();
   if(pinEntry.length===4)setTimeout(checkPin,120);
 }
-function pinBack(){if(pinBusy)return;pinEntry=pinEntry.slice(0,-1);updateDots();}
-function pinClear(){if(pinBusy)return;pinEntry='';updateDots();}
+function pinBack(){pinEntry=pinEntry.slice(0,-1);updateDots();}
+function pinClear(){pinEntry='';updateDots();}
 function updateDots(err){
   for(let i=0;i<4;i++){
     const d=document.getElementById('d'+i);
     d.className='pin-dot'+(i<pinEntry.length?' filled':'')+(err?' error':'');
   }
 }
-async function checkPin(){
-  pinBusy=true;
-  document.getElementById('pin-err').textContent='';
-  try{
-    const res=await fetch(WORKER_URL+'/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({pin:pinEntry})
-    });
-    if(res.ok){
-      const data=await res.json();
-      localStorage.setItem('aafets_token',data.token);
-      localStorage.setItem('aafets_token_exp',String(data.exp));
-      document.getElementById('pin-screen').classList.add('hidden');
-      pinUnlocked=true;
-      init();
-    } else if(res.status===429){
-      updateDots(true);
-      document.getElementById('pin-err').textContent='Too many attempts. Locked — try again later.';
-      pinEntry='';setTimeout(updateDots,900);
-    } else {
-      updateDots(true);
-      document.getElementById('pin-err').textContent='Incorrect PIN. Try again.';
-      setTimeout(()=>{pinEntry='';updateDots();document.getElementById('pin-err').textContent='';},900);
-    }
-  }catch(e){
+function checkPin(){
+  if(pinEntry===PIN_CODE){
+    localStorage.setItem('aafets_unlocked', 'yes');
+    document.getElementById('pin-screen').classList.add('hidden');
+    pinUnlocked=true;
+    init();
+  } else {
     updateDots(true);
-    document.getElementById('pin-err').textContent='Cannot reach server — check connection.';
-    pinEntry='';setTimeout(updateDots,900);
+    document.getElementById('pin-err').textContent='Incorrect PIN. Try again.';
+    setTimeout(()=>{pinEntry='';updateDots();document.getElementById('pin-err').textContent='';},900);
   }
-  pinBusy=false;
 }
 document.addEventListener('keydown',function(e){
   if(pinUnlocked)return;
@@ -806,17 +714,17 @@ function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':
    RENDER
 ══════════════════════════════════════════════ */
 function renderDashboard(){
-  const overdrawn=getEmployees().filter(e=>getBalance(e).annualRemaining<0).length;
-  const low=getEmployees().filter(e=>{const b=getBalance(e);return b.annualRemaining>=0&&b.annualRemaining<=1;}).length;
-  const sickLow=getEmployees().filter(e=>getBalance(e).sickRemaining<=5).length;
+  const overdrawn=getActiveEmployees().filter(e=>getBalance(e).annualRemaining<0).length;
+  const low=getActiveEmployees().filter(e=>{const b=getBalance(e);return b.annualRemaining>=0&&b.annualRemaining<=1;}).length;
+  const sickLow=getActiveEmployees().filter(e=>getBalance(e).sickRemaining<=5).length;
   document.getElementById('dash-metrics').innerHTML=`
-    <div class="metric"><div class="lbl">Team members</div><div class="val">${getEmployees().length}</div></div>
+    <div class="metric"><div class="lbl">Team members</div><div class="val">${getActiveEmployees().length}</div></div>
     <div class="metric"><div class="lbl">Annual overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
     <div class="metric"><div class="lbl">Annual low (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
     <div class="metric"><div class="lbl">Sick low (≤5 days)</div><div class="val" style="color:#d97706">${sickLow}</div></div>
     <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
-  let balRows2=getEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
+  let balRows2=getActiveEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
   if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
   const balKeys2=['emp','annualRemaining','takenAnnual','takenHrs','ac','sickRemaining','takenSick','_status','_sickStatus'];
   balRows2=balRows2.map(r=>({...r,_sickEnt:30,_status:r.annualRemaining<0?0:r.annualRemaining===0?1:r.annualRemaining<=1?2:3,_sickStatus:r.sickRemaining<0?0:r.sickRemaining===0?1:r.sickRemaining<=5?2:3}));
@@ -843,7 +751,7 @@ function renderDashboard(){
       <td>${sickStatusBadge(b.sickRemaining)}</td>
     </tr>`;
   }).join('');
-  setThClasses('panel-dashboard',bc,bd);
+  setThClasses('panel-dashboard',bc2,bd2);
 }
 /* sort state per table */
 const sortState={log:{col:3,dir:-1},adj:{col:2,dir:-1},hol:{col:0,dir:1},bal:{col:0,dir:1}};
@@ -1039,7 +947,7 @@ function exportToExcel(){
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
   const sheets=[
     {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Annual Earned','Annual Taken','Annual Remaining','Hourly Taken','Sick Entitlement','Sick Taken','Sick Remaining','Annual Status','Sick Status'],
-     rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp,b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=1?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
+     rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp+(isInactive(emp)?' (Inactive)':''),b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=1?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
     {name:'Leave Log',headers:['#','Employee','Type','From','To','Days','Hours','Deducted','Holiday?','Remarks'],
      rows:[...(S.leaves||[])].sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
     {name:'Adjustments',headers:['#','Employee','Date','Days','Reason'],
@@ -1081,57 +989,6 @@ function showPanel(id){
   if(id==='adjustments')renderAdj();
   if(id==='holidays')renderHolidays();
   if(id==='team')renderTeam();
-  if(id==='report')renderReport();
-}
-
-/* ══════════════════════════════════════════════
-   EMPLOYEE REPORT (read-only)
-══════════════════════════════════════════════ */
-function renderReport(){
-  const emp=document.getElementById('report-emp').value;
-  const empty=document.getElementById('report-empty');
-  const body=document.getElementById('report-body');
-  if(!emp){empty.style.display='block';body.style.display='none';return;}
-  empty.style.display='none';body.style.display='block';
-
-  const b=getBalance(emp);
-  document.getElementById('report-print-sub').textContent=emp+'  ·  Printed '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  document.getElementById('report-metrics').innerHTML=`
-    <div class="metric"><div class="lbl">Annual remaining</div><div class="val">${b.annualRemaining.toFixed(2)}</div></div>
-    <div class="metric"><div class="lbl">Annual taken</div><div class="val">${b.takenAnnual.toFixed(2)}</div></div>
-    <div class="metric"><div class="lbl">Hourly taken</div><div class="val">${b.takenHrs.toFixed(1)} h</div></div>
-    <div class="metric"><div class="lbl">Sick remaining</div><div class="val">${b.sickRemaining.toFixed(2)}</div></div>`;
-
-  const leaves=(S.leaves||[]).filter(l=>l.emp===emp).sort((a,b2)=>b2.from.localeCompare(a.from));
-  document.getElementById('report-log-tbody').innerHTML=leaves.map(l=>{
-    const ded=l.holiday?'<span class="badge badge-hol">Holiday</span>':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days;
-    return `<tr>
-      <td>${typeBadge(l.type)}</td>
-      <td style="white-space:nowrap">${fmtDate(l.from)}</td>
-      <td style="white-space:nowrap">${fmtDate(l.to||l.from)}</td>
-      <td>${l.type==='Hourly Leave'?'—':l.days}</td>
-      <td>${l.hours>0?l.hours+' h':'—'}</td>
-      <td>${ded}</td>
-      <td>${l.holiday?'<span class="badge badge-hol">Yes</span>':''}</td>
-      <td class="muted">${l.remarks||''}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="8" class="muted">No leave entries.</td></tr>`;
-
-  const adjs=(S.adjustments||[]).filter(a=>a.emp===emp).sort((a,b2)=>b2.date.localeCompare(a.date));
-  document.getElementById('report-adj-tbody').innerHTML=adjs.map(a=>{
-    const pos=parseFloat(a.days)>=0;
-    return `<tr>
-      <td style="white-space:nowrap">${fmtDate(a.date)}</td>
-      <td class="${pos?'pos':'neg'}">${pos?'+':''}${parseFloat(a.days).toFixed(2)}</td>
-      <td class="muted">${a.reason||''}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="3" class="muted">No adjustments.</td></tr>`;
-}
-
-function printReport(){
-  const emp=document.getElementById('report-emp').value;
-  if(!emp){alert('Select an employee first.');return;}
-  window.print();
 }
 
 
@@ -1224,6 +1081,22 @@ document.addEventListener('keydown',function(e){
 function getEmployees(){
   return S.employees && S.employees.length > 0 ? S.employees : [...EMPLOYEES];
 }
+function isInactive(emp){ return (S.inactive||[]).includes(emp); }
+function getActiveEmployees(){ return getEmployees().filter(e=>!isInactive(e)); }
+
+function toggleActive(emp){
+  if(!S.inactive) S.inactive=[];
+  if(isInactive(emp)){
+    S.inactive=S.inactive.filter(e=>e!==emp);
+  } else {
+    if(!confirm(`Deactivate ${emp}?\n\nAll their history is kept. They will be hidden from the dashboard and from the Add Leave / Adjustment dropdowns. You can reactivate them at any time.`)) return;
+    S.inactive.push(emp);
+  }
+  debounceSave();
+  refreshAllDropdowns();
+  renderTeam();
+  renderDashboard();
+}
 
 function renderTeam(){
   const emps = getEmployees();
@@ -1231,10 +1104,12 @@ function renderTeam(){
     const b = getBalance(emp);
     const op = parseFloat((S.opening||{})[emp]||0);
     return `<tr id="team-row-${i}">
-      <td style="font-weight:500">${emp}</td>
+      <td style="font-weight:500;${isInactive(emp)?'color:#9ca3af':''}">${emp}</td>
       <td>${op.toFixed(2)} days</td>
+      <td>${isInactive(emp)?'<span style="background:#f3f4f6;color:#6b7280;border-radius:10px;padding:2px 9px;font-size:11px">Inactive</span>':'<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:2px 9px;font-size:11px">Active</span>'}</td>
       <td style="white-space:nowrap;display:flex;gap:4px">
         <button class="btn" style="padding:3px 9px;font-size:11px;color:#1e40af;border-color:#93c5fd" onclick="startEditEmployee(${i})">Edit</button>
+        <button class="btn" style="padding:3px 9px;font-size:11px" onclick="toggleActive('${emp.replace(/'/g,"\\'")}')">${isInactive(emp)?'Reactivate':'Deactivate'}</button>
         <button class="btn btn-danger" onclick="removeEmployee('${emp}')">Remove</button>
       </td>
     </tr>`;
@@ -1248,6 +1123,7 @@ function startEditEmployee(i){
   document.getElementById('team-row-'+i).innerHTML = `
     <td><input class="edit-name-input" id="edit-emp-name-${i}" value="${emp}"></td>
     <td><input class="edit-name-input" id="edit-emp-bal-${i}" type="number" step="0.5" min="0" value="${op}" style="width:100px"></td>
+    <td>${isInactive(emp)?'Inactive':'Active'}</td>
     <td style="white-space:nowrap;display:flex;gap:4px">
       <button class="btn btn-primary" style="padding:3px 9px;font-size:11px" onclick="saveEditEmployee(${i},'${emp}')">Save</button>
       <button class="btn" style="padding:3px 9px;font-size:11px" onclick="renderTeam()">Cancel</button>
@@ -1263,6 +1139,7 @@ function saveEditEmployee(i, oldName){
 
   // Update name in employees list
   S.employees = emps.map(e => e===oldName ? newName : e);
+  if(S.inactive) S.inactive = S.inactive.map(e => e===oldName ? newName : e);
 
   // Update opening balance
   if(!S.opening) S.opening={};
@@ -1315,6 +1192,7 @@ Warning: this employee has existing leave records and/or adjustments. They will 
 
   if(!S.employees) S.employees = [...EMPLOYEES];
   S.employees = S.employees.filter(e=>e!==emp);
+  if(S.inactive) S.inactive = S.inactive.filter(e=>e!==emp);
   debounceSave();
   refreshAllDropdowns();
   renderTeam();
@@ -1323,22 +1201,19 @@ Warning: this employee has existing leave records and/or adjustments. They will 
 
 function refreshAllDropdowns(){
   const emps = getEmployees();
-  const empOptions = emps.map(e=>`<option>${e}</option>`).join('');
+  const empOptions = emps.map(e=>`<option value="${e}">${e}${isInactive(e)?' (inactive)':''}</option>`).join('');
+  const activeOptions = getActiveEmployees().map(e=>`<option>${e}</option>`).join('');
   const filterOptions = `<option value="">All employees</option>` + empOptions;
-  ['add-emp','adj-emp','edit-emp'].forEach(id=>{
+  ['add-emp','adj-emp'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el) el.innerHTML=empOptions;
+    if(el) el.innerHTML=activeOptions;
   });
+  const ee=document.getElementById('edit-emp');
+  if(ee) ee.innerHTML=empOptions;
   ['log-filter-emp','bal-filter-emp','adj-filter-emp'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML=filterOptions;
   });
-  const rep=document.getElementById('report-emp');
-  if(rep){
-    const cur=rep.value;
-    rep.innerHTML=`<option value="">Select employee...</option>`+empOptions;
-    if(cur&&emps.includes(cur))rep.value=cur;
-  }
 }
 
 /* ══════════════════════════════════════════════
@@ -1346,13 +1221,14 @@ function refreshAllDropdowns(){
 ══════════════════════════════════════════════ */
 async function init(){
   document.getElementById('cur-date').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  refreshAllDropdowns();
   toggleHourly();
   await loadFromCloud();
-  refreshAllDropdowns(); // must run AFTER cloud data loads, or dropdowns use the stale hardcoded list
+  refreshAllDropdowns();
   renderDashboard();
 }
 
-if(tokenValid()){
+if(localStorage.getItem('aafets_unlocked')==='yes'){
   document.getElementById('pin-screen').classList.add('hidden');
   pinUnlocked=true;
   init();
