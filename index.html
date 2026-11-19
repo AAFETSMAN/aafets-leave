@@ -434,6 +434,7 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
 
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 /* ══════════════════════════════════════════════
    CONFIG — only the Worker URL lives here.
@@ -699,7 +700,8 @@ function sickStatusBadge(r){
 function statusBadge(r){
   if(r<0) return`<span class="badge badge-over">Overdrawn</span>`;
   if(r===0)return`<span class="badge badge-over">No balance</span>`;
-  if(r<=1) return`<span class="badge badge-low">Low</span>`;
+  if(r<=ANNUAL_RED) return`<span class="badge badge-over">Critical</span>`;
+  if(r<=ANNUAL_AMBER) return`<span class="badge badge-low">Low</span>`;
   return`<span class="badge badge-ok">OK</span>`;
 }
 function typeBadge(t){
@@ -708,6 +710,9 @@ function typeBadge(t){
   return`<span class="badge badge-annual">Annual Leave</span>`;
 }
 function barPct(rem,earned){return earned>0?Math.max(0,Math.min(100,rem/earned*100)).toFixed(0):0;}
+const ANNUAL_BAR_MAX=21, ANNUAL_AMBER=4, ANNUAL_RED=2;
+function annBarPct(rem){return Math.max(0,Math.min(100,rem/ANNUAL_BAR_MAX*100)).toFixed(0);}
+function annBarCls(rem){return rem<=ANNUAL_RED?'bar-over':rem<=ANNUAL_AMBER?'bar-low':'bar-ok';}
 function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':p<0.25?'bar-low':'bar-ok';}
 
 /* ══════════════════════════════════════════════
@@ -715,19 +720,19 @@ function barCls(rem,earned){const p=earned>0?rem/earned:0;return p<0?'bar-over':
 ══════════════════════════════════════════════ */
 function renderDashboard(){
   const overdrawn=getActiveEmployees().filter(e=>getBalance(e).annualRemaining<0).length;
-  const low=getActiveEmployees().filter(e=>{const b=getBalance(e);return b.annualRemaining>=0&&b.annualRemaining<=1;}).length;
+  const low=getActiveEmployees().filter(e=>{const b=getBalance(e);return b.annualRemaining>=0&&b.annualRemaining<=ANNUAL_AMBER;}).length;
   const sickLow=getActiveEmployees().filter(e=>getBalance(e).sickRemaining<=5).length;
   document.getElementById('dash-metrics').innerHTML=`
     <div class="metric"><div class="lbl">Team members</div><div class="val">${getActiveEmployees().length}</div></div>
     <div class="metric"><div class="lbl">Annual overdrawn</div><div class="val" style="color:#dc2626">${overdrawn}</div></div>
-    <div class="metric"><div class="lbl">Annual low (≤1 day)</div><div class="val" style="color:#d97706">${low}</div></div>
+    <div class="metric"><div class="lbl">Annual low (≤4 days)</div><div class="val" style="color:#d97706">${low}</div></div>
     <div class="metric"><div class="lbl">Sick low (≤5 days)</div><div class="val" style="color:#d97706">${sickLow}</div></div>
     <div class="metric"><div class="lbl">Total leave entries</div><div class="val">${(S.leaves||[]).filter(l=>!l.holiday).length}</div></div>`;
   const feB=document.getElementById('bal-filter-emp')?document.getElementById('bal-filter-emp').value:'';
   let balRows2=getActiveEmployees().map(emp=>{const b=getBalance(emp);return{emp,...b};});
   if(feB)balRows2=balRows2.filter(r=>r.emp===feB);
   const balKeys2=['emp','annualRemaining','takenAnnual','takenHrs','ac','sickRemaining','takenSick','_status','_sickStatus'];
-  balRows2=balRows2.map(r=>({...r,_sickEnt:30,_status:r.annualRemaining<0?0:r.annualRemaining===0?1:r.annualRemaining<=1?2:3,_sickStatus:r.sickRemaining<0?0:r.sickRemaining===0?1:r.sickRemaining<=5?2:3}));
+  balRows2=balRows2.map(r=>({...r,_sickEnt:30,_status:r.annualRemaining<0?0:r.annualRemaining===0?1:r.annualRemaining<=ANNUAL_RED?2:r.annualRemaining<=ANNUAL_AMBER?3:4,_sickStatus:r.sickRemaining<0?0:r.sickRemaining===0?1:r.sickRemaining<=5?2:3}));
   const {col:bc2,dir:bd2}=sortState.bal;
   balRows2.sort((a,b)=>{let av=a[balKeys2[bc2]],bv=b[balKeys2[bc2]];if(typeof av==='number'&&typeof bv==='number')return bd2*(av-bv);return bd2*String(av||'').localeCompare(String(bv||''));});
   const balRows=balRows2;
@@ -737,7 +742,7 @@ function renderDashboard(){
       <td><div class="emp-cell"><div class="emp-avatar">${initials(b.emp)}</div><span style="font-weight:500">${b.emp}</span></div></td>
       <td><div style="display:flex;align-items:center;gap:8px">
         <span style="font-weight:600;min-width:38px">${b.annualRemaining.toFixed(2)}</span>
-        <div class="balance-bar"><div class="bfill ${barCls(b.annualRemaining,b.earned)}" style="width:${barPct(b.annualRemaining,b.earned)}%"></div></div>
+        <div class="balance-bar"><div class="bfill ${annBarCls(b.annualRemaining)}" style="width:${annBarPct(b.annualRemaining)}%"></div></div>
       </div></td>
       <td>${b.takenAnnual.toFixed(2)}</td>
       <td style="color:#888;font-size:12px">${b.takenHrs.toFixed(1)} h</td>
@@ -947,7 +952,7 @@ function exportToExcel(){
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
   const sheets=[
     {name:'Balances',headers:['Employee','Opening','Accrued','Adjustments','Annual Earned','Annual Taken','Annual Remaining','Hourly Taken','Sick Entitlement','Sick Taken','Sick Remaining','Annual Status','Sick Status'],
-     rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp+(isInactive(emp)?' (Inactive)':''),b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=1?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
+     rows:getEmployees().map(emp=>{const b=getBalance(emp);return[emp+(isInactive(emp)?' (Inactive)':''),b.op.toFixed(2),b.ac.toFixed(2),(b.adj>=0?'+':'')+b.adj.toFixed(2),b.earned.toFixed(2),b.takenAnnual.toFixed(2),b.annualRemaining.toFixed(2),b.takenHrs.toFixed(1)+'h',30,b.takenSick.toFixed(2),b.sickRemaining.toFixed(2),b.annualRemaining<0?'Overdrawn':b.annualRemaining<=ANNUAL_RED?'Critical':b.annualRemaining<=ANNUAL_AMBER?'Low':'OK',b.sickRemaining<0?'Overdrawn':b.sickRemaining<=5?'Low':'OK'];})},
     {name:'Leave Log',headers:['#','Employee','Type','From','To','Days','Hours','Deducted','Holiday?','Remarks'],
      rows:[...(S.leaves||[])].sort((a,b)=>b.from.localeCompare(a.from)).map((l,i)=>[i+1,l.emp,l.type,fmtDate(l.from),fmtDate(l.to||l.from),l.type==='Hourly Leave'?'':l.days,l.hours>0?l.hours+'h':'',l.holiday?'Holiday':l.type==='Hourly Leave'?(l.hours/8).toFixed(3):l.days,l.holiday?'Yes':'No',l.remarks||''])},
     {name:'Adjustments',headers:['#','Employee','Date','Days','Reason'],
@@ -959,21 +964,15 @@ function exportToExcel(){
   const H='style="background:#1b2a4a;color:#fff;font-weight:bold;border:1px solid #aaa;padding:6px 10px;white-space:nowrap"';
   const C='style="border:1px solid #dde;padding:5px 10px"';
   const A='style="background:#f5f7fa;border:1px solid #dde;padding:5px 10px"';
-  let html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>`;
-  sheets.forEach(s=>{html+=`<x:ExcelWorksheet><x:Name>${esc(s.name)}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>`;});
-  html+=`</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>`;
-  sheets.forEach(s=>{
-    html+=`<div style="margin-bottom:40px"><div style="background:#1b2a4a;color:#fff;padding:10px 16px;font-weight:bold;font-size:13px;font-family:Arial">AAFETS Leave Management &nbsp;·&nbsp; ${s.name} &nbsp;·&nbsp; Exported: ${today}</div>`;
-    html+=`<table border="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;width:100%"><thead><tr>${s.headers.map(h=>`<th ${H}>${esc(h)}</th>`).join('')}</tr></thead><tbody>`;
-    s.rows.forEach((row,i)=>{html+=`<tr>${row.map(c=>`<td ${i%2===0?C:A}>${esc(c)}</td>`).join('')}</tr>`;});
-    html+=`</tbody></table></div>`;
+  if(typeof XLSX==='undefined'){alert('Excel library failed to load (check internet connection) — refresh and try again.');return;}
+  const wb=XLSX.utils.book_new();
+  sheets.forEach(sh=>{
+    const rows=sh.rows.map(r=>r.map(c=>(typeof c==='string'&&/^[+-]?\d+(\.\d+)?$/.test(c))?Number(c):c));
+    const ws=XLSX.utils.aoa_to_sheet([sh.headers,...rows]);
+    ws['!cols']=sh.headers.map((h,ci)=>({wch:Math.min(40,Math.max(String(h).length,...rows.map(r=>String(r[ci]??'').length))+2)}));
+    XLSX.utils.book_append_sheet(wb,ws,sh.name);
   });
-  html+=`</body></html>`;
-  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='AAFETS_Leave_Export_'+new Date().toISOString().slice(0,10)+'.xls';
-  a.click();URL.revokeObjectURL(url);
+  XLSX.writeFile(wb,'AAFETS_Leave_Export_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ══════════════════════════════════════════════
