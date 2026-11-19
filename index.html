@@ -441,7 +441,22 @@ input[type=checkbox]{width:auto;margin-right:6px;accent-color:#1e40af}
    No tokens, no secrets, nothing sensitive.
 ══════════════════════════════════════════════ */
 const WORKER_URL = 'https://aafets-sync.atheer-mohammed.workers.dev';
-const PIN_CODE   = '5287';
+/* PIN is verified server-side by the Worker (POST /login) and exchanged for a signed session token. */
+function getSession(){
+  try{const x=JSON.parse(localStorage.getItem('aafets_session')||'null');
+    if(x&&x.token&&x.exp>Math.floor(Date.now()/1000)+60)return x;}catch(e){}
+  return null;
+}
+function authHeaders(extra){
+  const x=getSession();
+  return Object.assign({},extra||{},x?{'Authorization':'Bearer '+x.token}:{});
+}
+function sessionExpired(){
+  try{localStorage.removeItem('aafets_session');}catch(e){}
+  pinUnlocked=false; pinEntry=''; updateDots();
+  document.getElementById('pin-screen').classList.remove('hidden');
+  const el=document.getElementById('pin-err'); if(el)el.textContent='Session expired. Enter PIN.';
+}
 
 /* ══════════════════════════════════════════════
    DEFAULT DATA (used only on very first load)
@@ -548,19 +563,25 @@ function setSyncBadge(state,msg){
 async function loadFromCloud(){
   showLoading('Loading data...');
   try{
-    const res=await fetch(WORKER_URL,{method:'GET'});
+    const res=await fetch(WORKER_URL,{method:'GET',headers:authHeaders()});
+    if(res.status===401){ sessionExpired(); throw new Error('Session expired — enter PIN'); }
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
+    cloudOk=true; hideCloudBanner();
     if(data.leaves&&data.leaves.length>0){
       S=data;
+    } else if(data.employees&&data.employees.length>0){
+      S=data; if(!S.leaves)S.leaves=[];
     } else {
-      S=JSON.parse(JSON.stringify(DEFAULT_DATA));
-      await saveToCloud();
+      throw new Error('Cloud returned no data (empty response) — not overwriting');
     }
     try{localStorage.setItem('aafets_cache',JSON.stringify(S));}catch(e){}
     setSyncBadge('ok','Synced');
   }catch(e){
-    setSyncBadge('err','Offline — local cache');
+    cloudOk=false;
+    console.error('Cloud load failed:',e);
+    setSyncBadge('err','Cloud unreachable');
+    showCloudBanner('Cannot reach the cloud database ('+(e&&e.message?e.message:'network error')+'). The data below may be OUT OF DATE and changes will NOT be saved. Press Sync to retry.');
     const cached=localStorage.getItem('aafets_cache');
     if(cached) S=JSON.parse(cached);
     else S=JSON.parse(JSON.stringify(DEFAULT_DATA));
@@ -568,21 +589,35 @@ async function loadFromCloud(){
   hideLoading();
 }
 
+let cloudOk=false;
+function showCloudBanner(msg){
+  let b=document.getElementById('cloud-banner');
+  if(!b){b=document.createElement('div');b.id='cloud-banner';b.style.cssText='background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:13px;font-weight:500';
+    const nav=document.querySelector('.nav'); nav.parentNode.insertBefore(b,nav);}
+  b.textContent=msg; b.style.display='block';
+}
+function hideCloudBanner(){const b=document.getElementById('cloud-banner'); if(b)b.style.display='none';}
+
 async function saveToCloud(){
+  if(!cloudOk){ showCloudBanner('Change NOT saved: the cloud database was not reached at load time. Press Sync, confirm it says Synced, then redo the change.'); setSyncBadge('err','Not saved'); return; }
   setSyncBadge('saving','Saving...');
   try{localStorage.setItem('aafets_cache',JSON.stringify(S));}catch(e){}
   try{
     const res=await fetch(WORKER_URL,{
       method:'PUT',
-      headers:{'Content-Type':'application/json'},
+      headers:authHeaders({'Content-Type':'application/json'}),
       body:JSON.stringify(S)
     });
+    if(res.status===401){ cloudOk=false; sessionExpired(); throw new Error('Session expired'); }
     if(!res.ok) throw new Error('HTTP '+res.status);
+    let rb={}; try{rb=await res.json();}catch(e){}
+    if(rb.ok===false) throw new Error('GitHub rejected save (status '+rb.status+')');
     setSyncBadge('ok','Synced ✓');
     setTimeout(()=>setSyncBadge('ok','Synced'),2000);
   }catch(e){
     setSyncBadge('err','Save failed — retrying...');
-    setTimeout(saveToCloud,5000);
+    if(!pinUnlocked) return;
+    setTimeout(()=>{ if(cloudOk&&pinUnlocked) saveToCloud(); },5000);
   }
 }
 
@@ -592,7 +627,7 @@ function debounceSave(){
 }
 
 function forcSync(){
-  loadFromCloud().then(()=>{refreshAllDropdowns();renderDashboard();renderLog();renderAdj();renderHolidays();});
+  loadFromCloud().then(()=>{refreshAllDropdowns();renderDashboard();renderTeam();renderLog();renderAdj();renderHolidays();});
 }
 
 /* ══════════════════════════════════════════════
@@ -623,17 +658,21 @@ function updateDots(err){
     d.className='pin-dot'+(i<pinEntry.length?' filled':'')+(err?' error':'');
   }
 }
-function checkPin(){
-  if(pinEntry===PIN_CODE){
-    localStorage.setItem('aafets_unlocked', 'yes');
-    document.getElementById('pin-screen').classList.add('hidden');
-    pinUnlocked=true;
-    init();
-  } else {
-    updateDots(true);
-    document.getElementById('pin-err').textContent='Incorrect PIN. Try again.';
-    setTimeout(()=>{pinEntry='';updateDots();document.getElementById('pin-err').textContent='';},900);
-  }
+async function checkPin(){
+  const errEl=document.getElementById('pin-err');
+  const fail=(msg)=>{updateDots(true);errEl.textContent=msg;setTimeout(()=>{pinEntry='';updateDots();errEl.textContent='';},1400);};
+  try{
+    const res=await fetch(WORKER_URL+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:pinEntry})});
+    let data={}; try{data=await res.json();}catch(e){}
+    if(res.ok&&data.token){
+      localStorage.setItem('aafets_session',JSON.stringify({token:data.token,exp:data.exp}));
+      document.getElementById('pin-screen').classList.add('hidden');
+      pinUnlocked=true; pinEntry='';
+      init();
+    } else if(res.status===429){ fail('Too many attempts. Try again in 15 min.'); }
+    else if(res.status===401){ fail('Incorrect PIN. Try again.'); }
+    else { fail('Server error ('+res.status+'). Try again.'); }
+  }catch(e){ fail('Cannot reach server. Check connection.'); }
 }
 document.addEventListener('keydown',function(e){
   if(pinUnlocked)return;
@@ -1227,7 +1266,7 @@ async function init(){
   renderDashboard();
 }
 
-if(localStorage.getItem('aafets_unlocked')==='yes'){
+if(getSession()){
   document.getElementById('pin-screen').classList.add('hidden');
   pinUnlocked=true;
   init();
